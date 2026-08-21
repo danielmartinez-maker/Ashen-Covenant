@@ -74,5 +74,11 @@ assert.equal(game.player.presentation.combatContext.primaryClass, 'warden');
 assert.equal(game.player.presentation.resolvedClip.clipId, 'warden:idle');
 assert.equal(presentation.eventBus.recent('animation:clip-resolved', 1).length, 1);
 assert.equal(presentation.eventBus.recent('presentation:combat-context', 1).length, 1);
+assert.equal(presentation.beginPlayerAttack(1), true);
+presentation.updateGameplay(0.1);
+presentation.update(1 / 60);
+assert.ok(game.player.presentation.actionProgress > 0 && game.player.presentation.actionProgress <= 1, 'AnimationDirector must publish normalized action progress');
+assert.ok(Number.isFinite(game.player.presentation.locomotionProgress), 'AnimationDirector must publish normalized locomotion progress');
+assert.equal(game.player.presentation.combatContext.actionProgress, game.player.presentation.actionProgress, 'combat context must consume published action progress');
 
 console.log('Ashen Covenant v7 animation clip contract regression passed.');
