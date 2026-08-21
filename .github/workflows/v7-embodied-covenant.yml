@@ -71,6 +71,7 @@ jobs:
         run: npm run test:v6
 
   full-tests-node22:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -84,6 +85,7 @@ jobs:
       - run: npm run test:v6
 
   build-and-file-protocol:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -97,6 +99,7 @@ jobs:
       - run: npm run test:file-protocol
 
   windows-package:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -110,6 +113,7 @@ jobs:
       - run: npm run desktop:win:portable
 
   static-integrity:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -162,6 +166,7 @@ jobs:
           grep -R -n -E 'TODO|FIXME|HACK|XXX' src desktop || true
 
   class-matrix-smoke:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -223,6 +228,7 @@ jobs:
           NODE
 
   toolchain-contract:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -238,6 +244,7 @@ jobs:
       - run: npm ci
 
   dependency-audit:
+    needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
