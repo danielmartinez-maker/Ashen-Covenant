@@ -31,3 +31,5 @@ jobs:
         run: node scripts/data-integrity-audit.mjs
       - name: Adversarial runtime and unintended behavior audit
         run: node scripts/unintended-behavior-audit.mjs
+      - name: Hostile Hunter persistence audit
+        run: node scripts/hunter-hardening-audit.mjs
