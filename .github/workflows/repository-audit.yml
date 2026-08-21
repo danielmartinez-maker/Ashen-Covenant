@@ -27,3 +27,5 @@ jobs:
       - run: npm ci
       - name: Read and validate every tracked code/text file
         run: node scripts/full-repo-audit.mjs
+      - name: Traverse and cross-check every exported data module
+        run: node scripts/data-integrity-audit.mjs
