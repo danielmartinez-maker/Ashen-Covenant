@@ -59,5 +59,11 @@ jobs:
           if [ -f scripts/v7-equipment-resolver.mjs ]; then
             node scripts/v7-equipment-resolver.mjs
           fi
+      - name: V7 equipment renderer regression
+        shell: bash
+        run: |
+          if [ -f scripts/v7-equipment-renderer.mjs ]; then
+            node scripts/v7-equipment-renderer.mjs
+          fi
       - name: V6 regression gate
         run: npm run test:v6
