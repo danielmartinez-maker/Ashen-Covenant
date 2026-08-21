@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { EquipmentAppearanceResolver, equipmentAppearanceRevisionKey } from '../src/presentation/equipment-appearance-v7.js';
 import { resolveCovenantPresentationIdentity } from '../src/presentation/covenant-identity.js';
 
@@ -47,5 +48,10 @@ game.player.equipment.weapon = { id: 'live-bell', slot: 'weapon', baseId: 'cleav
 presentation.update(1 / 60);
 assert.equal(game.player.presentation.equipmentAppearance.signatureIds.includes('unique:bell-sunder'), true);
 assert.equal(presentation.getDebugSnapshot().equipmentAppearance.cache.size >= 1, true);
+
+const gameSource = fs.readFileSync(new URL('../src/systems/game.js', import.meta.url), 'utf8');
+const lootSource = fs.readFileSync(new URL('../src/systems/loot.js', import.meta.url), 'utf8');
+assert.doesNotMatch(gameSource, /player\.equipmentPresentation\s*=/, 'v7 live appearance must not be assigned by GameEngine stat refresh');
+assert.doesNotMatch(lootSource, /\bpresentationForEquipment\s*\(/, 'LootSystem must not expose live equipment presentation authority');
 
 console.log('Ashen Covenant v7 equipment appearance resolver regression passed.');
