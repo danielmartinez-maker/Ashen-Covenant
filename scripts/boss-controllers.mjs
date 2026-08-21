@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict';
+import { BOSS_DEFINITIONS, BossController } from '../src/systems/boss-controller.js';
+import { DomainEventBus } from '../src/systems/domain-events.js';
+
+const ids = ['bellwitness','tollingabbot','cryptwarden','bloodmatron','bogsovereign','burialengine','chainregent','mirrorapostle','veiledoracle','silenceincarnate'];
+assert.deepEqual(Object.keys(BOSS_DEFINITIONS).sort(), [...ids].sort());
+const fingerprints = ids.map((id) => BOSS_DEFINITIONS[id].phases.map((phase) => phase.mechanics.join('|')).join('>'));
+assert.equal(new Set(fingerprints).size, ids.length, 'each boss needs its own mechanic grammar');
+assert(new Set(ids.map((id) => BOSS_DEFINITIONS[id].thresholds.join(':'))).size >= 5, 'phase pacing should not be one shared template');
+
+const bus = new DomainEventBus();
+let phaseEvent = null;
+bus.on('boss:phase-changed', (detail) => { phaseEvent = detail; });
+const controller = new BossController(bus);
+const boss = { id: 'boss-1', templateId: 'cryptwarden', boss: true, maxHp: 1000, hp: 1000, attackCount: 0, phase: 1 };
+let state = controller.update(boss, { covenant: { primary: 'grave', secondary: 'flame' }, now: 1 });
+assert.equal(state.phase, 1);
+boss.hp = 600;
+state = controller.update(boss, { covenant: { primary: 'grave', secondary: 'flame' }, now: 2 });
+assert(state.phase >= 2);
+assert.equal(phaseEvent?.bossId, boss.id);
+assert(state.intermission > 0);
+const sequence = Array.from({ length: 6 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index, phase: state.phase }, state).id);
+const repeated = Array.from({ length: 6 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index, phase: state.phase }, state).id);
+assert.deepEqual(sequence, repeated, 'boss sequence is deterministic');
+const voidState = controller.update({ ...boss, id: 'boss-void' }, { covenant: { primary: 'void' }, now: 3 });
+assert.notEqual(voidState.variantId, state.variantId, 'Covenant state can alter boss variant');
+assert(controller.nextMechanic(boss, voidState).tags.includes('void') || voidState.modifiers.length > 0);
+
+const blackRoadBoss = { id: 'black-road-crypt', templateId: 'cryptwarden', boss: true, maxHp: 1000, hp: 300, attackCount: 0, phase: 2 };
+assert.equal(controller.update(blackRoadBoss, { covenant: {}, now: 5 }).phase, 3, 'Funeral Road legacy final-phase boundary is 30% HP');
+
+console.log('Ashen Covenant authored BossController regression passed.');
+
+const store = new Map();
+globalThis.localStorage = { getItem: (key) => store.get(key) ?? null, setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) };
+const { GameEngine } = await import('../src/systems/game.js');
+const input = { pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; }, isHeld() { return false; }, consume() { return false; }, defer() {}, rumble() {} };
+const game = new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 } }, { reducedVfx: true });
+assert(game.start('warden', 'thornseer'));
+assert(game.bossController instanceof BossController);
+game.player.covenant.affinities.grave = 90;
+game.player.covenant.stage = 5;
+const liveBoss = game._spawnEnemy('cryptwarden', game.player.x + 140, game.player.y, { level: 15, group: 'boss-test', engaged: true });
+assert(liveBoss?.boss);
+let livePhase = null;
+const offPhase = game.domainEvents.on('boss:phase-changed', (detail) => { livePhase = detail; });
+liveBoss.hp = liveBoss.maxHp * 0.55;
+game._updateBossPhase(liveBoss);
+offPhase();
+assert.equal(liveBoss.phase, 2);
+assert.equal(livePhase?.enemyId, 'cryptwarden');
+assert.equal(liveBoss.bossRuntime.variantId, 'grave-bound');
+const beforeEffects = game.entities.hazards.length + game.entities.projectiles.length;
+liveBoss.attackCount = 0;
+liveBoss.telegraph = { targetX: game.player.x, targetY: game.player.y, angle: 0 };
+game._bossAttack(liveBoss);
+assert(liveBoss.lastBossMechanic);
+assert(game.entities.hazards.length + game.entities.projectiles.length > beforeEffects, 'authored boss mechanic executes through existing combat primitives');

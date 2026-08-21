@@ -1,0 +1,49 @@
+Cue ID,Region,Context,Intensity,Stems,Looping,Transition,Priority,Asset Status,Implementation Status,Testing Status,Notes
+mus-ui-main-menu,Global,MainMenu,0.00-0.35,4,Yes,Next bar,20,Original procedural placeholder,Implemented,Automated,Resident synthesis
+mus-ui-character-creation,Global,CharacterCreation,0.00-0.40,5,Yes,Next bar,24,Original procedural placeholder,Implemented,Automated,Class motif offset follows selection
+mus-loading-embers,Global,Loading,0.00-0.30,2,Yes,Immediate,80,Original procedural placeholder,Implemented,Automated,Resident synthesis
+mus-narrative-names,Global,Narrative,0.00-0.55,2,Yes,Next beat,96,Original procedural placeholder,Implemented,Automated,Dialogue mix duck
+mus-sanctuary-exploration,Sanctuary,Settlement,0.08-0.52,4,Yes,Next bar,42,Original procedural placeholder,Implemented,Automated,Variable day/night silence
+mus-sanctuary-combat,Sanctuary,Combat,0.42-1.00,6,Yes,Next bar,65,Original procedural placeholder,Implemented,Automated,Combat overrides settlement
+mus-sanctuary-dungeon,Sanctuary,Dungeon,0.18-0.76,5,Yes,Next bar,55,Original procedural placeholder,Implemented,Automated,Depth stem
+mus-gravewake-exploration,Gravewake,Exploration,0.08-0.52,4,Yes,Next bar,30,Original procedural placeholder,Implemented,Automated,Brittle bell identity
+mus-gravewake-combat,Gravewake,Combat,0.42-1.00,6,Yes,Next bar,65,Original procedural placeholder,Implemented,Automated,Vertical combat layers
+mus-gravewake-dungeon,Gravewake,Dungeon,0.18-0.76,5,Yes,Next bar,55,Original procedural placeholder,Implemented,Automated,Depth stem
+mus-redfen-exploration,Redfen,Exploration,0.08-0.52,4,Yes,Next bar,30,Original procedural placeholder,Implemented,Automated,Wet reed identity
+mus-redfen-combat,Redfen,Combat,0.42-1.00,6,Yes,Next bar,65,Original procedural placeholder,Implemented,Automated,Vertical combat layers
+mus-redfen-dungeon,Redfen,Dungeon,0.18-0.76,5,Yes,Next bar,55,Original procedural placeholder,Implemented,Automated,Depth stem
+mus-cairnreach-exploration,Cairnreach,Exploration,0.08-0.52,4,Yes,Next bar,30,Original procedural placeholder,Implemented,Automated,Iron chain identity
+mus-cairnreach-combat,Cairnreach,Combat,0.42-1.00,6,Yes,Next bar,65,Original procedural placeholder,Implemented,Automated,Vertical combat layers
+mus-cairnreach-dungeon,Cairnreach,Dungeon,0.18-0.76,5,Yes,Next bar,55,Original procedural placeholder,Implemented,Automated,Depth stem
+mus-veiled-road-exploration,Veiled Road,Exploration,0.08-0.52,4,Yes,Next bar,30,Original procedural placeholder,Implemented,Automated,Glass whisper identity
+mus-veiled-road-combat,Veiled Road,Combat,0.42-1.00,6,Yes,Next bar,65,Original procedural placeholder,Implemented,Automated,Vertical combat layers
+mus-veiled-road-dungeon,Veiled Road,Dungeon,0.18-0.76,5,Yes,Next bar,55,Original procedural placeholder,Implemented,Automated,Depth stem
+mus-bellscar-exploration,Bellscar,Exploration,0.08-0.52,4,Yes,Next bar,30,Original procedural placeholder,Implemented,Automated,Broken choir identity
+mus-bellscar-combat,Bellscar,Combat,0.42-1.00,6,Yes,Next bar,65,Original procedural placeholder,Implemented,Automated,Vertical combat layers
+mus-bellscar-dungeon,Bellscar,Dungeon,0.18-0.76,5,Yes,Next bar,55,Original procedural placeholder,Implemented,Automated,Depth stem
+mus-boss-bellwitness,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,Unique motif offset
+mus-boss-tollingabbot,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,Unique tempo/motif
+mus-boss-cryptwarden,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,5/4 meter
+mus-boss-bloodmatron,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,Unique tempo/motif
+mus-boss-bogsovereign,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,Unique tempo/motif
+mus-boss-burialengine,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,5/4 meter
+mus-boss-chainregent,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,Unique tempo/motif
+mus-boss-mirrorapostle,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,Unique tempo/motif
+mus-boss-veiledoracle,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,5/4 meter
+mus-boss-silenceincarnate,Boss arena,Boss,0.62-1.00,7,Yes,Next bar,92,Original procedural placeholder,Implemented,Automated,Unique tempo/motif
+mus-player-death,Global,PlayerDeath,0.00-1.00,2,Yes,Immediate,97,Original procedural placeholder,Implemented,Automated,Boss phase remains recoverable
+mus-victory-release,Global,Victory,0.00-1.00,2,Yes,Next bar,86,Original procedural placeholder,Implemented,Automated,Used after post-boss silence
+mus-credits-covenant-endures,Global,Credits,0.00-1.00,5,Yes,Next bar,100,Original procedural placeholder,Implemented,Automated,World motif statement
+stinger:boss-reveal,Global,Boss reveal,N/A,3 notes,No,Immediate,95,Original procedural placeholder,Implemented,Automated,Same encounter cannot replay on revive
+stinger:boss-phase,Global,Boss phase,N/A,3 notes,No,Immediate,92,Original procedural placeholder,Implemented,Automated,1.2 s cooldown
+stinger:boss-defeat,Global,Boss defeat,N/A,4 notes,No,Immediate,98,Original procedural placeholder,Implemented,Automated,Starts post-boss silence
+stinger:death,Global,Death,N/A,3 notes,No,Immediate,100,Original procedural placeholder,Implemented,Automated,Highest priority
+stinger:resurrection,Global,Resurrection,N/A,4 notes,No,Immediate,96,Original procedural placeholder,Implemented,Automated,Current boss phase resumes
+stinger:legendary,Global,Relic drop,N/A,3 notes,No,Immediate,68,Original procedural placeholder,Implemented,Automated,Triggered at spawn; 3.5 s cooldown
+stinger:unique,Global,Unique drop,N/A,4 notes,No,Immediate,76,Original procedural placeholder,Implemented,Automated,Triggered at spawn; 4.5 s cooldown
+stinger:mythic,Global,Mythic drop,N/A,5 notes,No,Immediate,88,Original procedural placeholder,Implemented,Automated,Triggered at spawn; 6 s cooldown
+stinger:level,Global,Level up,N/A,4 notes,No,Immediate,72,Original procedural placeholder,Implemented,Automated,Priority managed
+stinger:stronghold-liberated,Regional,Stronghold victory,N/A,5 notes,No,Immediate,84,Original procedural placeholder,Implemented,Automated,World-state event
+stinger:operation-victory,Regional,Endgame victory,N/A,5 notes,No,Immediate,79,Original procedural placeholder,Implemented,Automated,Completion event
+stinger:combo-finisher,Global,Combo accent,N/A,2 notes,No,Immediate,36,Original procedural placeholder,Implemented,Automated,0.45 s cooldown
+stinger:ultimate,Class-colored,Ultimate,N/A,4 notes,No,Immediate,86,Original procedural placeholder,Implemented,Automated,2.5 s cooldown

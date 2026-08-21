@@ -1,0 +1,9 @@
+# Ashen Covenant: The Black Road v5.0.1 — Bug-Squash Report
+
+The v5.0.1 pass focused on world-geometry authority, combat consistency, presentation state, and release validation. Twenty-four defects or hardening gaps were corrected: stale endgame wave/activity fields; broken dynamic Black Road arena contraction; zero-vector circle and inclusive-edge rectangle collision failures; sealed rooms inheriting overworld props; unsafe spawn/save/fast-travel/endgame/Veilrunner/leash positions; crowd and player-enemy separation crossing walls; burrow and pull displacement bypassing collision; projectile tunneling; melee and line/cone attacks through obstacles; click-to-move LOS/stuck steering; ground-targeted abilities through walls; and camera dead-zone logic suppressing look-ahead.
+
+A new dependency-free `test:core` gate covers geometry, projectiles, LOS, camera, presentation context, static UI references, six-class combat fuzz, campaign, Black Road, progression, loot, Masterwork, contracts, systemic gameplay, animation, music, 2.5D behavior, and a 241-actor stress test. Three repeated bug-fuzz runs passed, as did the complete core suite and syntax checks across 73 JavaScript modules. The latest stress run had zero streaming underruns.
+
+Fresh image generation is unavailable in this session. I therefore did **not** mislabel the transform-derived v7 body sheets, synthesized SFX, or rarity-only equipment presentation as newly authored assets. Those three art/audio limitations remain. The existing asset interfaces remain replacement-ready without another engine rewrite.
+
+JSDOM/Vite UI tests remain unavailable because their extracted dependency directories are empty; Chromium navigation is also blocked by administrator policy in this environment. Static UI integrity checks passed instead.

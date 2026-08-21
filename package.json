@@ -1,0 +1,52 @@
+{
+  "name": "ashen-covenant",
+  "version": "6.0.0",
+  "description": "Ashen Covenant: The Black Road v6.0.0, an offline 2.5D dual-oath action RPG built around Covenant Metamorphosis, authored skill mutations, faction doctrines, persistent Hunters, living regional state, evolved Sanctuary, and Covenant-reactive Black Road endgame.",
+  "author": "Ashen Covenant",
+  "desktopName": "ashen-covenant",
+  "private": true,
+  "type": "module",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node scripts/v5-production-overhaul.mjs && node scripts/verify.mjs && node scripts/action-rpg-overhaul.mjs && node scripts/requiem-overhaul.mjs && node scripts/black-road-overhaul.mjs && node scripts/black-road-ui.mjs && node scripts/game-smoke.mjs && node scripts/campaign-smoke.mjs && node scripts/progression-dynamics.mjs && node scripts/leveling-journey.mjs && node scripts/systems-depth.mjs && node scripts/loot-expansion.mjs && node scripts/masterwork-classes.mjs && node scripts/regression-audit.mjs && node scripts/deep-regression.mjs && node scripts/ui-smoke.mjs && node scripts/loot-ui-smoke.mjs && node scripts/visual-affix-ux.mjs && node scripts/input-ui-regression.mjs && node scripts/ui-ux-overhaul.mjs && node scripts/worldfall-expansion.mjs && node scripts/contracts-overhaul.mjs && node scripts/systemic-overhaul.mjs && node scripts/systemic-ui.mjs && node scripts/presentation-overhaul.mjs && node scripts/adaptive-music.mjs && node scripts/presentation-ui.mjs && node scripts/2_5d-revamp.mjs && node scripts/spell-attack-animation.mjs && node --expose-gc scripts/presentation-performance.mjs",
+    "test:presentation": "node scripts/presentation-overhaul.mjs && node scripts/adaptive-music.mjs && node scripts/presentation-ui.mjs",
+    "test:presentation:performance": "node --expose-gc scripts/presentation-performance.mjs",
+    "test:file-protocol": "npm run build && electron --no-sandbox --headless scripts/file-protocol-smoke.cjs",
+    "desktop": "npm run build && electron .",
+    "desktop:win": "npm run build && electron-builder --win dir --x64 && node scripts/finalize-windows-release.mjs",
+    "desktop:win:portable": "npm run build && electron-builder --win portable --x64",
+    "test:core": "node scripts/v5-0-1-bug-squash.mjs && node scripts/ui-static-integrity.mjs && node scripts/v5-production-overhaul.mjs && node scripts/verify.mjs && node scripts/action-rpg-overhaul.mjs && node scripts/requiem-overhaul.mjs && node scripts/black-road-overhaul.mjs && node scripts/game-smoke.mjs && node scripts/campaign-smoke.mjs && node scripts/progression-dynamics.mjs && node scripts/leveling-journey.mjs && node scripts/systems-depth.mjs && node scripts/loot-expansion.mjs && node scripts/masterwork-classes.mjs && node scripts/regression-audit.mjs && node scripts/deep-regression.mjs && node scripts/worldfall-expansion.mjs && node scripts/contracts-overhaul.mjs && node scripts/systemic-overhaul.mjs && node scripts/presentation-overhaul.mjs && node scripts/adaptive-music.mjs && node scripts/2_5d-revamp.mjs && node scripts/spell-attack-animation.mjs && node --expose-gc scripts/presentation-performance.mjs",
+    "test:v6": "node scripts/save-v19-migration.mjs && node scripts/covenant-metamorphosis.mjs && node scripts/ability-mutations.mjs && node scripts/progression-consolidation.mjs && node scripts/combat-hit-context.mjs && node scripts/enemy-doctrines.mjs && node scripts/named-hunters.mjs && node scripts/boss-controllers.mjs && node scripts/loot-behaviors.mjs && node scripts/loot-engine-integration.mjs && node scripts/loot-chase-runtime.mjs && node scripts/loot-presentation-renderer.mjs && node scripts/living-world-v6.mjs && node scripts/living-sanctuary-v6.mjs && node scripts/endgame-covenant-integration.mjs && node scripts/metamorphosis-ui-v6.mjs && node scripts/covenant-presentation-v6.mjs && node scripts/architecture-boundaries-v6.mjs && node scripts/migration-matrix-v6.mjs && node --expose-gc scripts/performance-v6.mjs && npm run test:core && node scripts/release-contract-v6.mjs"
+  },
+  "build": {
+    "appId": "com.ashencovenant.game",
+    "productName": "Ashen Covenant",
+    "icon": "build/icon.ico",
+    "asar": true,
+    "files": [
+      "dist/**",
+      "desktop/**",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "dir"
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "${productName}-${version}-Windows-x64.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "^43.1.1",
+    "electron-builder": "^26.0.0",
+    "jsdom": "^26.0.0",
+    "vite": "^7.0.0"
+  }
+}

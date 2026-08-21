@@ -1,0 +1,78 @@
+import assert from 'node:assert/strict';
+
+const store = new Map();
+globalThis.localStorage = { getItem: (key) => store.get(key) ?? null, setItem: (key, value) => store.set(key, value), removeItem: (key) => store.delete(key) };
+const { GameEngine } = await import('../src/systems/game.js');
+
+const queued = [];
+const input = {
+  pointer: { active: true, worldX: 820, worldY: 620 },
+  tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; },
+  isHeld() { return false; }, consume(action) { const index = queued.indexOf(action); if (index < 0) return false; queued.splice(index, 1); return true; }, defer() {}, press(action) { queued.push(action); }
+};
+const renderer = { viewport: { width: 1280, height: 720, scale: 1 } };
+const game = new GameEngine(input, renderer, { reducedVfx: true });
+assert.ok(game.start('warden', 'thornseer'));
+assert.equal(game.getHybrid().id, 'briar-oath');
+assert.equal(game.entities.enemies.length, 0, 'the Sanctuary road must not repopulate into an ambient survival horde');
+assert.ok(game.startBlackRoadExpedition('funeral-road'), 'an authored Black Road expedition must launch from Sanctuary');
+assert.ok(game.entities.enemies.length >= 4, 'the expedition must populate its first committed formation');
+const starter = game.entities.enemies.find((enemy) => !enemy.boss);
+const preKill = game.stats.kills;
+game._damageEnemy(starter, starter.maxHp * 3, { source: 'test', stagger: 2 });
+assert.ok(game.stats.kills > preKill, 'enemy damage should resolve death, loot, and progression');
+game.player.skillPoints = 1;
+assert.ok(game.upgradeSkill(game.getSkillNodes()[0].id), 'skill tree investment should work');
+assert.ok(!game.upgradeSkill('warden-judgment'), 'skill nodes must respect level and prerequisite gates');
+game.player.level = 25;
+game.player.skillPoints = 30;
+game.player.gold = 10000;
+game._refreshPlayerStats(true);
+assert.ok(game.upgradeSkill('warden-judgment'));
+assert.ok(game.upgradeSkill('warden-judgment'));
+assert.ok(game.upgradeSkill('warden-nailstorm'));
+assert.ok(game.upgradeSkill('warden-nailstorm'));
+assert.ok(game.upgradeSkill('warden-penitent'), 'a fully prepared class branch should reach its capstone');
+const hybridId = game.getHybrid().id;
+for (let index = 0; index < 4; index += 1) assert.ok(game.upgradeSkill(`${hybridId}-${index}`), 'hybrid board nodes should unlock in order');
+assert.ok(game.upgradeSkill(`${hybridId}-aegis`), 'hybrid capstones should become available after the board');
+assert.ok(!game.upgradeSkill(`${hybridId}-ruin`), 'hybrid capstones must be mutually exclusive');
+assert.ok(!game.refundSkill(`${hybridId}-3`), 'refunds must protect invested dependent nodes');
+assert.match(game.getSkillNodeState(game.getSkillNodes().find((node) => node.id === `${hybridId}-ruin`)).lockReason, /Concord of Aegis/);
+const temperTarget = game._generateItem(false);
+const salvageTarget = game._generateItem(false);
+const stashTarget = game._generateItem(false);
+const loadoutTarget = game._generateItem(false);
+const lockedTarget = game._generateItem(false);
+game.player.inventory.push(temperTarget, salvageTarget, stashTarget, loadoutTarget, lockedTarget);
+game.player.materials.cinders = 99;
+game.player.materials.echoes = 9;
+assert.ok(game.temperItem(temperTarget.id), 'forge tempering should consume materials and improve an affix');
+assert.ok(game.corruptItem(temperTarget.id), 'forge corruption should add a benefit and a permanent risk');
+assert.ok(game.salvageItem(salvageTarget.id), 'forge salvage should return materials');
+assert.ok(game.stashItem(stashTarget.id), 'pack items should move into the sanctuary stash');
+assert.ok(game.player.stash.some((item) => item.id === stashTarget.id));
+assert.ok(game.retrieveItem(stashTarget.id), 'stash items should return to the pack');
+assert.ok(game.toggleItemLock(lockedTarget.id));
+assert.ok(!game.salvageItem(lockedTarget.id), 'a locked item must resist accidental salvage');
+assert.ok(game.toggleItemLock(lockedTarget.id));
+assert.ok(game.salvageItem(lockedTarget.id), 'an unlocked item can be salvaged');
+assert.ok(game.equipItem(loadoutTarget.id), 'inventory gear should equip into its matching slot');
+assert.ok(game.saveLoadout(0), 'equipment should save as a loadout');
+assert.ok(game.unequipItem(loadoutTarget.slot), 'equipped gear should return to storage');
+assert.ok(game.applyLoadout(0), 'a saved loadout should re-equip its recorded items');
+assert.ok(game.getStats().hp >= 1, 'crafting downsides must not invalidate player stats');
+game.player.resource = game.player.maxResource;
+assert.ok(game.selectImprint('skillOne', 'forked'), 'level-gated skill imprints should be selectable');
+const projectileCount = game.entities.projectiles.length;
+game._skillOne();
+assert.ok(game.entities.projectiles.length >= projectileCount + 3, 'the Forked Oath imprint should alter the live combat action');
+game._setCampaignStage('chapter-one-complete', 1);
+game.returnToSanctuary();
+assert.equal(game.endgame, null, 'the active expedition must support an explicit return before launching another activity');
+assert.ok(game.startEndgame('arena', 3));
+assert.equal(game.endgame.activity, 'arena');
+assert.ok(game.entities.enemies.every((enemy) => enemy.group === game.endgame.id));
+for (let index = 0; index < 4; index += 1) game.update(1 / 60);
+assert.ok(store.size > 0, 'game state should save locally');
+console.log('Ashen Covenant combat/world smoke test passed.');
