@@ -14,6 +14,8 @@ export const EQUIPMENT_SLOT_FAMILIES = Object.freeze({
   boots: Object.freeze(['road', 'gallows', 'rift', 'plate'])
 });
 
+const EQUIPMENT_SLOT_ROW = Object.freeze({ weapon: 0, offhand: 1, head: 2, chest: 3, gloves: 4, boots: 5 });
+
 export const RARITY_MATERIALS = Object.freeze({
   common: Object.freeze({ trim: 0, emissive: 0, material: 'worn' }),
   magic: Object.freeze({ trim: 1, emissive: 0.04, material: 'tempered' }),
@@ -37,6 +39,14 @@ const familyFromBase = (base) => {
 
 const BASE_FAMILIES = Object.freeze(Object.fromEntries(ITEM_BASES.map((base) => [base.id, familyFromBase(base)])));
 export const equipmentBaseFamily = (baseId, slot = null) => BASE_FAMILIES[baseId] ?? EQUIPMENT_SLOT_FAMILIES[slot]?.[0] ?? 'neutral';
+export const equipmentFamilyCell = (baseId, slot) => {
+  const families = EQUIPMENT_SLOT_FAMILIES[slot];
+  const row = EQUIPMENT_SLOT_ROW[slot];
+  if (!families || !Number.isInteger(row)) return -1;
+  const family = equipmentBaseFamily(baseId, slot);
+  const column = Math.max(0, families.indexOf(family));
+  return row * EQUIPMENT_LAYER_ASSETS.layers.columns + column;
+};
 
 const glyphs = ['◆', '✦', '☉', '✹', '◇', '†', '⛓', '☾', '♮', '⬡', '☠', '☼', '◐', '⚚', '✷', '⌁'];
 export const UNIQUE_VISUAL_SIGNATURES = Object.freeze(Object.fromEntries(UNIQUES.map((unique, index) => {
