@@ -7,18 +7,23 @@ import {
 } from '../data/equipment-appearance-v7.js';
 
 const SLOT_ORDER = Object.freeze({ boots: 3, chest: 4, head: 5, gloves: 6, offhand: 7, weapon: 8 });
-const VISIBLE_SLOTS = Object.freeze(['weapon', 'offhand', 'head', 'chest', 'gloves', 'boots']);
-const DRAW_ORDER = Object.freeze(['boots', 'chest', 'head', 'gloves', 'offhand', 'weapon']);
+const BODY_SLOTS = new Set(Object.keys(SLOT_ORDER));
+const IDENTITY_ORDER = Object.freeze(['boots', 'chest', 'head', 'gloves', 'offhand', 'weapon', 'amulet', 'ring']);
 const RARITY_ORDER = Object.freeze(['common', 'magic', 'rare', 'relic', 'unique', 'mythic']);
 
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const corruptionLevelFor = (item = {}) => {
+  if (Number.isFinite(Number(item.corruptionRank))) return Math.max(0, Number(item.corruptionRank));
+  if (Number.isFinite(Number(item.corruption))) return Math.max(0, Number(item.corruption));
+  return typeof item.corruption === 'string' && item.corruption.trim() ? 1 : 0;
+};
 const stableItem = (item) => item ? [
   item.id ?? '', item.baseId ?? '', item.uniqueId ?? '', item.rarity ?? 'common',
-  finite(item.masterworkRank ?? item.masterwork, 0), finite(item.corruption ?? item.corruptionRank, 0)
+  finite(item.masterworkRank ?? item.masterwork, 0), corruptionLevelFor(item)
 ].join(':') : '-';
 
 export const equipmentAppearanceRevisionKey = (equipment = {}, covenantIdentity = {}, reducedVfx = false) => [
-  ...VISIBLE_SLOTS.map((slot) => `${slot}=${stableItem(equipment[slot])}`),
+  ...IDENTITY_ORDER.map((slot) => `${slot}=${stableItem(equipment[slot])}`),
   `cov=${covenantIdentity.affinity ?? covenantIdentity.primary ?? 'unbound'}:${finite(covenantIdentity.stage, 0)}`,
   `reduced=${Boolean(reducedVfx)}`
 ].join('|');
@@ -46,20 +51,23 @@ export class EquipmentAppearanceResolver {
     let maxCorruption = 0;
     let highestRarity = 'common';
 
-    for (const slot of DRAW_ORDER) {
+    for (const slot of IDENTITY_ORDER) {
       const item = equipment[slot];
       if (!item) continue;
-      const family = equipmentBaseFamily(item.baseId, slot);
-      const cell = equipmentFamilyCell(item.baseId, slot);
-      layers.push(Object.freeze({
-        kind: 'slot', slot, assetId: EQUIPMENT_LAYER_ASSETS.layers.id, cell, family,
-        order: SLOT_ORDER[slot], opacity: 0.72, blend: 'source-over', requiredIdentity: false
-      }));
 
       maxMasterwork = Math.max(maxMasterwork, finite(item.masterworkRank ?? item.masterwork, 0));
-      maxCorruption = Math.max(maxCorruption, finite(item.corruption ?? item.corruptionRank, 0));
+      maxCorruption = Math.max(maxCorruption, corruptionLevelFor(item));
       const rarity = RARITY_ORDER.includes(item.rarity) ? item.rarity : 'common';
       if (RARITY_ORDER.indexOf(rarity) > RARITY_ORDER.indexOf(highestRarity)) highestRarity = rarity;
+
+      if (BODY_SLOTS.has(slot)) {
+        const family = equipmentBaseFamily(item.baseId, slot);
+        const cell = equipmentFamilyCell(item.baseId, slot);
+        layers.push(Object.freeze({
+          kind: 'slot', slot, assetId: EQUIPMENT_LAYER_ASSETS.layers.id, cell, family,
+          order: SLOT_ORDER[slot], opacity: 0.72, blend: 'source-over', requiredIdentity: false
+        }));
+      }
 
       const signature = uniqueSignature(item.uniqueId);
       if (signature) {
