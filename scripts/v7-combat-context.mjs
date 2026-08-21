@@ -63,6 +63,22 @@ assert.ok(context.visualSignatureIds.includes('unique:bell-sunder'));
 assert.equal(context.masterworkRank, 8, 'context derives maximum visible Masterwork rank');
 assert.equal(context.corruptionLevel, 2, 'context derives maximum visible corruption rank');
 
+const textCorruptedPlayer = {
+  ...player,
+  id: 'player-corrupted',
+  equipment: {
+    amulet: {
+      id: 'amulet-corrupted', slot: 'amulet', baseId: 'obelisk-charm', rarity: 'unique', uniqueId: 'bloodroot-idol',
+      corruption: 'Forbidden precision; Fractured armor'
+    }
+  }
+};
+const textCorruptionContext = resolver.resolve({ ...game, player: textCorruptedPlayer }, {}, { actor: textCorruptedPlayer, eventType: 'frame' });
+const corruptedAmulet = textCorruptionContext.visibleEquipment.find((item) => item.slot === 'amulet');
+assert.equal(corruptedAmulet.corruption, 1, 'production text-form corruption must normalize to a nonzero presentation level');
+assert.equal(textCorruptionContext.corruptionLevel, 1, 'aggregate combat presentation must retain production corruption state');
+assert.ok(textCorruptionContext.visualSignatureIds.includes('unique:bloodroot-idol'), 'accessory Unique signatures must remain visible to presentation context');
+
 const neutral = neutralPresentationCombatContext();
 assert.equal(Object.isFrozen(neutral), true);
 assert.equal(neutral.actorKind, 'unknown');
