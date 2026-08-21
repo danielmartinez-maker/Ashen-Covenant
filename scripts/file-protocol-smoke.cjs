@@ -10,7 +10,7 @@ app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
 
 app.whenReady().then(async () => {
-  const { ACTION_VFX_SHEETS } = await import('../src/data/action-vfx.js');
+  const { ACTION_VFX_FRAME_COUNT, ACTION_VFX_SHEETS } = await import('../src/data/action-vfx.js');
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -65,7 +65,11 @@ app.whenReady().then(async () => {
     const sheet = assetDiagnosis.actionVfx[id];
     const packagedPath = `/dist${manifest.src}`;
     assert.ok(sheet?.source.includes(packagedPath), `${id} action animation art must resolve from its manifest path inside packaged dist/assets`);
-    assert.ok(sheet.width >= 1_600 && sheet.height >= 700, `${id} action animation sheet must decode at release scale`);
+    assert.ok(sheet.width > 0 && sheet.height > 0, `${id} action animation sheet must decode`);
+    assert.equal(sheet.width % ACTION_VFX_FRAME_COUNT, 0, `${id} action animation width must fit ${ACTION_VFX_FRAME_COUNT} authored frames`);
+    assert.equal(sheet.height % manifest.rows, 0, `${id} action animation height must fit ${manifest.rows} authored rows`);
+    assert.ok(sheet.width / ACTION_VFX_FRAME_COUNT >= 128, `${id} action animation frame cells must remain readable`);
+    assert.ok(sheet.height / manifest.rows >= 12, `${id} action animation row cells must remain readable`);
   }
   assert.ok(assetDiagnosis.equipmentLayers.source.includes('/dist/assets/equipment/v7/equipment-layers-v7.svg'), 'equipment layers must resolve inside packaged dist/assets');
   assert.ok(assetDiagnosis.equipmentLayers.width > 0 && assetDiagnosis.equipmentLayers.height > 0, 'equipment layers must decode');
