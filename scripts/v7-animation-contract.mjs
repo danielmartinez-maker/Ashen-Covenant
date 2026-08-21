@@ -52,4 +52,27 @@ assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movemen
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movementState: 'run', locomotionProgress: 0.64, settings: Object.freeze({ reducedMotion: true }) })).semanticState, 'walk');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movementState: 'run', locomotionProgress: 0.64 })).progress, 0.64);
 
+const store = new Map();
+globalThis.localStorage = {
+  getItem: (key) => store.get(key) ?? null,
+  setItem: (key, value) => store.set(key, String(value)),
+  removeItem: (key) => store.delete(key)
+};
+const { GameEngine } = await import('../src/systems/game.js');
+const { GamePresentationSystem } = await import('../src/presentation/system.js');
+const input = {
+  pointer: { active: false, worldX: 0, worldY: 0 },
+  tick() {}, updateWorldPointer() {},
+  getMove() { return { x: 0, y: 0, moving: false }; },
+  getAimDirection() { return null; }, isHeld() { return false; }, consume() { return false; }, defer() {}, press() {}, rumble() {}
+};
+const game = new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 }, getAssetStatus: () => ({ ready: true, failed: [] }) }, { sound: false, reducedVfx: true });
+const presentation = new GamePresentationSystem(game, { input, settings: game.settings, audio: null, strictEvents: true });
+assert.equal(game.start('warden', 'thornseer'), true);
+presentation.update(1 / 60);
+assert.equal(game.player.presentation.combatContext.primaryClass, 'warden');
+assert.equal(game.player.presentation.resolvedClip.clipId, 'warden:idle');
+assert.equal(presentation.eventBus.recent('animation:clip-resolved', 1).length, 1);
+assert.equal(presentation.eventBus.recent('presentation:combat-context', 1).length, 1);
+
 console.log('Ashen Covenant v7 animation clip contract regression passed.');
