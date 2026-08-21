@@ -3,6 +3,7 @@ import { DISTRICTS } from '../data/expansion.js';
 import { ENCOUNTER_ROOMS } from '../data/requiem.js';
 import { ZONES, zoneAt } from '../data/world.js';
 import { ACTION_VFX_FRAME_COUNT, ACTION_VFX_SHEETS } from '../data/action-vfx.js';
+import { HERO_MOTION_ASSETS } from '../data/animation-v7.js';
 import { covenantVfxPhase } from '../presentation/covenant-identity.js';
 import { clamp, easeOutCubic, fromAngle } from '../core/math.js';
 import { resolveAssetUrl } from '../core/assets.js';
@@ -21,9 +22,7 @@ const rgba = (hex, alpha = 1) => {
 // The hero is presented as a 2.5D character, not a rotatable top-down token.
 // Each class now resolves through eight authored/derived three-quarter views. Combat can still aim in
 // the plane, while the body remains locked to grounded 45-degree facing stances.
-const PLAYER_ROWS = { ironbound: 0, thornseer: 1, warden: 2, veilrunner: 3, gravebinder: 4, dawnstrider: 5 };
 const PLAYER_FACING_ANGLES = [0, Math.PI * .25, Math.PI * .5, Math.PI * .75, Math.PI, -Math.PI * .75, -Math.PI * .5, -Math.PI * .25];
-const HERO_MOTION_STATES = Object.freeze({ idle: 0, run: 1, attack1: 2, attack2: 3, attack3: 4, cast: 5, ward: 5, companion: 5, hybrid: 5, dodge: 6, hit: 7, death: 8, execution: 4, ultimate: 9, potion: 5, resurrection: 9 });
 const ENEMY_SPRITES = {
   mireling: ['a', 1], ashbow: ['a', 2], cairnguard: ['a', 0], cinderbrute: ['b', 3], candlepriest: ['a', 3],
   riftstalker: ['d', 2], echomonk: ['d', 0], bonevulture: ['d', 3], chainwidow: ['d', 2], wardeater: ['d', 3],
@@ -67,14 +66,13 @@ export class Renderer {
     this.assetState = { pending: 0, loaded: 0, failed: new Map() };
     this.assetPromises = [];
     this.assets = {
-      heroes: this._loadImage('/assets/hero-facing-atlas-v5.png'),
+      heroMotion: Object.fromEntries(Object.entries(HERO_MOTION_ASSETS).map(([classId, asset]) => [classId, this._loadImage(asset.src)])),
       enemyMotion: {
         a: this._loadImage('/assets/enemy-motion-a-v7.png'),
         b: this._loadImage('/assets/enemy-motion-b-v7.png'),
         c: this._loadImage('/assets/enemy-motion-c-v7.png'),
         d: this._loadImage('/assets/enemy-motion-d-v7.png')
       },
-      heroMotion: new Map(),
       props: this._loadImage('/assets/environment-props-v5.png'),
       entrances: this._loadImage('/assets/entrance-atlas-v5.png'),
       npcs: this._loadImage('/assets/npc-atlas-v5.png'),
@@ -114,7 +112,7 @@ export class Renderer {
   }
 
   getAssetStatus() {
-    const required = [this.assets.heroes, ...Object.values(this.assets.enemyMotion), ...Object.values(this.assets.actionVfx), this.assets.props, this.assets.entrances, this.assets.npcs, this.assets.items, this.assets.terrain];
+    const required = [...Object.values(this.assets.heroMotion), ...Object.values(this.assets.enemyMotion), ...Object.values(this.assets.actionVfx), this.assets.props, this.assets.entrances, this.assets.npcs, this.assets.items, this.assets.terrain];
     return {
       ready: this.assetState.pending === 0 && this.assetState.failed.size === 0 && required.every((image) => this._assetReady(image)),
       pending: this.assetState.pending,
@@ -143,20 +141,6 @@ export class Renderer {
       });
       return [zone.id, entries];
     }));
-  }
-
-  _loadOptionalImage(src) {
-    if (typeof Image === 'undefined') return null;
-    const image = new Image();
-    image.decoding = 'async';
-    image.src = resolveAssetUrl(src);
-    return image;
-  }
-
-  _heroMotionImage(classId) {
-    if (!classId) return null;
-    if (!this.assets.heroMotion.has(classId)) this.assets.heroMotion.set(classId, this._loadOptionalImage(`/assets/hero-motion-${classId}-v7.png`));
-    return this.assets.heroMotion.get(classId);
   }
 
   _assetReady(image) {
@@ -1110,21 +1094,11 @@ export class Renderer {
       ctx.beginPath(); ctx.arc(0, 0, player.radius + 9 + Math.sin(game.clock * 6) * 2, 0, Math.PI * 2); ctx.stroke();
     }
     const spriteSize = player.radius * 7.1;
-    const combo = player.presentation?.action?.profile?.comboIndex ?? player.attackChain ?? 1;
-    const motionStateName = player.deathTime > 0 ? 'death' : player.presentation?.reaction ? 'hit' : actionType === 'attack' ? `attack${Math.max(1, Math.min(3, combo))}` : player.dash ? 'dodge' : moving && actionType === 'idle' ? 'run' : actionType;
-    const motionState = HERO_MOTION_STATES[motionStateName] ?? HERO_MOTION_STATES.idle;
-    let motionProgress = 0;
-    if (player.deathTime > 0) motionProgress = clamp(1 - player.deathTime / 1.15, 0, .999);
-    else if (player.presentation?.reaction) motionProgress = clamp(1 - (player.presentation.reaction.time / Math.max(.01, player.presentation.reaction.duration)), 0, .999);
-    else if (animation.duration && animation.time > 0) motionProgress = clamp(1 - animation.time / animation.duration, 0, .999);
-    else if (moving) motionProgress = ((gait / (Math.PI * 2)) % 1 + 1) % 1;
-    else motionProgress = ((game.clock * 1.35) % 1 + 1) % 1;
-    const motionFrame = Math.min(7, Math.floor(motionProgress * 8));
-    const heroMotion = this._heroMotionImage(player.primary);
-    const motionRow = motionState * 8 + facingIndex;
-    const spriteDrawn = this._assetReady(heroMotion)
-      ? this._drawAtlas(heroMotion, 8, 80, motionRow * 8 + motionFrame, 0, -player.radius * .26, spriteSize, spriteSize)
-      : this._drawAtlas(this.assets.heroes, 4, 6, (PLAYER_ROWS[player.primary] ?? 0) * 4 + Math.min(3, Math.floor(facingIndex / 2)), 0, -player.radius * .26, spriteSize, spriteSize);
+    const resolvedClip = player.presentation?.resolvedClip;
+    const heroMotion = resolvedClip ? this.assets.heroMotion[player.primary] : null;
+    const spriteDrawn = resolvedClip && this._assetReady(heroMotion)
+      ? this._drawAtlas(heroMotion, 8, 80, resolvedClip.row * 8 + resolvedClip.frame, 0, -player.radius * .26, spriteSize, spriteSize)
+      : false;
     if (!spriteDrawn) { ctx.restore(); return; }
     const equipped = Object.values(player.equipment ?? {}).filter(Boolean);
     const equipmentPresentation = player.equipmentPresentation ?? {};
