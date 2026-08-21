@@ -7,6 +7,7 @@ const FACING_STEP = Math.PI / 4;
 const freezeRecord = (value) => Object.freeze({ ...(value ?? {}) });
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const laneFor = (angle = 0) => ((Math.round(finite(angle) / FACING_STEP) % 8) + 8) % 8;
+const signatureIdFor = (item) => item?.visualSignatureId ?? (item?.uniqueId ? `unique:${item.uniqueId}` : null);
 
 export const neutralPresentationCombatContext = () => Object.freeze({
   actorId: null, actorKind: 'unknown', enemyRole: null, bossId: null, hunterId: null,
@@ -41,11 +42,13 @@ export class PresentationCombatContextResolver {
         slot: item.slot,
         baseId: item.baseId ?? null,
         uniqueId: item.uniqueId ?? null,
-        visualSignatureId: item.visualSignatureId ?? item.uniqueId ?? null,
+        visualSignatureId: signatureIdFor(item),
         rarity: item.rarity ?? 'common',
         masterworkRank: finite(item.masterworkRank ?? item.masterwork, 0),
         corruption: finite(item.corruption ?? item.corruptionRank, 0)
       }));
+      const equippedMasterworkRank = visibleEquipment.reduce((maximum, item) => Math.max(maximum, item.masterworkRank), 0);
+      const equippedCorruptionLevel = visibleEquipment.reduce((maximum, item) => Math.max(maximum, item.corruption), 0);
       const hit = detail.hitResult ?? detail.result ?? {};
       const zone = zoneAt(actor.x ?? player?.x ?? 0, actor.y ?? player?.y ?? 0);
       const hybrid = player ? getHybrid(player.primary, player.secondary) : null;
@@ -61,8 +64,10 @@ export class PresentationCombatContextResolver {
         movementIntensity: clamp(finite(actor.presentation?.locomotion?.speedRatio, Math.hypot(actor.moveX ?? 0, actor.moveY ?? 0) / 250), 0, 1.5),
         elevation: Math.max(0, finite(actor.elevation, 0)), grounded: actor.grounded !== false, surface: actor.surface ?? 'stone', region: zone.id,
         weaponFamily: player?.presentation?.profile?.weapon ?? null, offhandFamily: player?.equipment?.offhand?.baseId ?? null,
-        visibleEquipment: Object.freeze(visibleEquipment), rarity: detail.rarity ?? 'common', corruptionLevel: finite(detail.corruptionLevel, 0), masterworkRank: finite(detail.masterworkRank, 0),
-        visualSignatureIds: Object.freeze(equipment.map((item) => item.visualSignatureId ?? item.uniqueId).filter(Boolean)),
+        visibleEquipment: Object.freeze(visibleEquipment), rarity: detail.rarity ?? 'common',
+        corruptionLevel: Math.max(equippedCorruptionLevel, finite(detail.corruptionLevel, 0)),
+        masterworkRank: Math.max(equippedMasterworkRank, finite(detail.masterworkRank, 0)),
+        visualSignatureIds: Object.freeze(visibleEquipment.map((item) => item.visualSignatureId).filter(Boolean)),
         covenantPrimary: covenant.primary ?? 'unbound', covenantSecondary: covenant.secondary ?? null, covenantStage: finite(covenant.stage, 0),
         covenantInstability: finite(covenant.instability, 0), covenantRupture: Boolean(covenant.ruptureActive), covenantIdentity,
         hitWeight: detail.hitWeight ?? hit.weight ?? (detail.critical ? 'heavy' : 'light'), damageFamily: detail.damageFamily ?? detail.damageType ?? 'physical',
