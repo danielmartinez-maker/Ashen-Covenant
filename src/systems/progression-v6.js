@@ -1,10 +1,11 @@
 import { ABILITY_MUTATIONS, ABILITY_SLOTS, abilityIdFor, mutationByAnyId, mutationById } from '../data/ability-mutations.js';
 
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const normalize = (player) => {
   const raw = record(player?.mutationProgress);
   return {
-    credits: Math.max(0, Math.floor(Number(raw.credits) || 0)),
+    credits: Math.max(0, Math.floor(finite(raw.credits, 0))),
     selections: { ...record(raw.selections) },
     unlocked: Array.isArray(raw.unlocked) ? [...new Set(raw.unlocked.filter((id) => mutationByAnyId(id)))] : [],
     legacyConverted: raw.legacyConverted === true
