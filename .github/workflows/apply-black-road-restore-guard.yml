@@ -1,0 +1,37 @@
+name: Apply Black Road Restore Guard
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v7-embodied-covenant
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - run: node scripts/apply-black-road-restore-guard.mjs
+      - run: node --check src/systems/game.js
+      - run: node scripts/unintended-behavior-audit.mjs
+      - name: Commit targeted fix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/systems/game.js
+          git diff --cached --quiet && exit 0
+          test "$(git diff --cached --name-only)" = "src/systems/game.js"
+          git commit -m 'fix: recover invalid Black Road checkpoints'
+          git push origin HEAD:v7-embodied-covenant
