@@ -31,7 +31,7 @@ jobs:
       - name: Commit generated atlases
         shell: bash
         run: |
-          if git diff --quiet -- public/assets/equipment/v7; then
+          if [ -z "$(git status --porcelain -- public/assets/equipment/v7)" ]; then
             echo "No generated asset changes required."
             exit 0
           fi
