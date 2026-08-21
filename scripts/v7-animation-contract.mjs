@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { ANIMATION_SEMANTIC_STATES, HERO_MOTION_ASSETS, PLAYER_ANIMATION_CLIPS } from '../src/data/animation-v7.js';
 import { AnimationClipResolver } from '../src/presentation/animation-clips-v7.js';
 
@@ -51,6 +52,12 @@ assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'dodge' })).sem
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movementState: 'run', locomotionProgress: 0.64 })).semanticState, 'run');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movementState: 'run', locomotionProgress: 0.64, settings: Object.freeze({ reducedMotion: true }) })).semanticState, 'walk');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movementState: 'run', locomotionProgress: 0.64 })).progress, 0.64);
+
+const rendererSource = fs.readFileSync(new URL('../src/systems/renderer.js', import.meta.url), 'utf8');
+assert.match(rendererSource, /HERO_MOTION_ASSETS/, 'renderer must use the v7 hero-motion manifest');
+assert.match(rendererSource, /resolvedClip/, 'renderer must consume the resolved v7 clip');
+assert.doesNotMatch(rendererSource, /_heroMotionImage\(/, 'renderer must not lazily load required hero sheets');
+assert.doesNotMatch(rendererSource, /hero-facing-atlas-v5\.png[\s\S]{0,700}_drawPlayer/, 'certified player-body path must not depend on the static v5 atlas');
 
 const store = new Map();
 globalThis.localStorage = {
