@@ -53,6 +53,6 @@ export const UNIQUE_VISUAL_SIGNATURES = Object.freeze(Object.fromEntries(UNIQUES
     impactVariant: index % 5,
     preserveWhenReduced: true
   })];
-}));
+})));
 
 export const uniqueSignature = (uniqueId) => UNIQUE_VISUAL_SIGNATURES[uniqueId] ?? null;
