@@ -1,0 +1,50 @@
+name: Import Ashen Covenant v6.0.0
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  import-full-game:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download and verify v6.0.0 source archive
+        env:
+          DROPBOX_URL: "https://uce966d55283a0e04f7dd131b89f.dl.dropboxusercontent.com/cd/0/get/DGqbLyV72B6skD5X7JrtCtgncJQnsii-YpQANUgBGtxJtjH0VO09xYzxOxdAMMj9An5PFM4SBh0pzj5SARNdxTUnj99s7eyp5WfzzC_noarP7xYXAZVEyUiToYrH68_Gl3UnsfAl191J7QJa3iWI1luo835vMlrlIELfzqlSnRyN2g/file?c_luid=5a0ff20e"
+        run: |
+          set -euo pipefail
+          curl -L --fail --silent --show-error "$DROPBOX_URL" -o /tmp/ashen-v6.zip
+          echo 'f20ceb9c26cc8ba7bbd4f6911dfa1cea09d0e0ff3e03ddb36b74107fb34cd66c  /tmp/ashen-v6.zip' | sha256sum -c -
+
+      - name: Unpack exact game tree
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/ashen-v6
+          mkdir -p /tmp/ashen-v6
+          unzip -q /tmp/ashen-v6.zip -d /tmp/ashen-v6
+          SRC=/tmp/ashen-v6/Ashen_Covenant_The_Black_Road_v6.0.0
+          test -f "$SRC/package.json"
+          test -f "$SRC/README.md"
+          rsync -a --delete --exclude='.git/' "$SRC/" ./
+
+      - name: Verify and commit all 218 files
+        run: |
+          set -euo pipefail
+          git config user.name 'Ashen Covenant Release Bot'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          COUNT=$(git ls-files | wc -l | tr -d ' ')
+          echo "Tracked files: $COUNT"
+          test "$COUNT" = '218'
+          git diff --cached --check
+          git commit -m 'release: import complete Ashen Covenant v6.0.0'
+          git push origin HEAD:main
