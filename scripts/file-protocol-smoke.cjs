@@ -10,6 +10,7 @@ app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
 
 app.whenReady().then(async () => {
+  const { ACTION_VFX_SHEETS } = await import('../src/data/action-vfx.js');
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -59,8 +60,11 @@ app.whenReady().then(async () => {
     assert.ok(motion.source.includes(`/dist/assets/enemy-motion-${id}-v7.png`), `${id} enemy-motion art must resolve inside packaged dist/assets`);
     assert.ok(motion.width > 0 && motion.height > 0, `${id} enemy-motion atlas must decode`);
   }
-  for (const [id, sheet] of Object.entries(assetDiagnosis.actionVfx)) {
-    assert.ok(sheet.source.includes(`/dist/assets/attack-vfx-${id}-v6.png`), `${id} action animation art must resolve inside packaged dist/assets`);
+  assert.deepEqual(Object.keys(assetDiagnosis.actionVfx).sort(), Object.keys(ACTION_VFX_SHEETS).sort(), 'runtime action VFX sheets must match the data manifest');
+  for (const [id, manifest] of Object.entries(ACTION_VFX_SHEETS)) {
+    const sheet = assetDiagnosis.actionVfx[id];
+    const packagedPath = `/dist${manifest.src}`;
+    assert.ok(sheet?.source.includes(packagedPath), `${id} action animation art must resolve from its manifest path inside packaged dist/assets`);
     assert.ok(sheet.width >= 1_600 && sheet.height >= 700, `${id} action animation sheet must decode at release scale`);
   }
   assert.ok(assetDiagnosis.equipmentLayers.source.includes('/dist/assets/equipment/v7/equipment-layers-v7.svg'), 'equipment layers must resolve inside packaged dist/assets');
