@@ -6,6 +6,11 @@ import { resolveCovenantPresentationIdentity } from './covenant-identity.js';
 const FACING_STEP = Math.PI / 4;
 const freezeRecord = (value) => Object.freeze({ ...(value ?? {}) });
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const corruptionLevelFor = (item = {}) => {
+  if (Number.isFinite(Number(item.corruptionRank))) return Math.max(0, Number(item.corruptionRank));
+  if (Number.isFinite(Number(item.corruption))) return Math.max(0, Number(item.corruption));
+  return typeof item.corruption === 'string' && item.corruption.trim() ? 1 : 0;
+};
 const laneFor = (angle = 0) => ((Math.round(finite(angle) / FACING_STEP) % 8) + 8) % 8;
 const signatureIdFor = (item) => item?.visualSignatureId ?? (item?.uniqueId ? `unique:${item.uniqueId}` : null);
 
@@ -45,7 +50,7 @@ export class PresentationCombatContextResolver {
         visualSignatureId: signatureIdFor(item),
         rarity: item.rarity ?? 'common',
         masterworkRank: finite(item.masterworkRank ?? item.masterwork, 0),
-        corruption: finite(item.corruption ?? item.corruptionRank, 0)
+        corruption: corruptionLevelFor(item)
       }));
       const equippedMasterworkRank = visibleEquipment.reduce((maximum, item) => Math.max(maximum, item.masterworkRank), 0);
       const equippedCorruptionLevel = visibleEquipment.reduce((maximum, item) => Math.max(maximum, item.corruption), 0);
