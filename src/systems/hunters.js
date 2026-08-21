@@ -15,6 +15,7 @@ const rewardForFaction = Object.freeze({
 let nextHunter = 1;
 const unique = (values = []) => [...new Set(values.filter(Boolean))];
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 
 function adaptationCandidates(context = {}) {
   const source = String(context.source ?? '').toLowerCase();
@@ -31,6 +32,7 @@ function adaptationCandidates(context = {}) {
 
 export class HunterSystem {
   normalize(hunter = {}) {
+    hunter = record(hunter);
     return {
       id: hunter.id ?? `hunter-${nextHunter++}`,
       name: hunter.name ?? 'Scarred Hunter',
