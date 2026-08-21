@@ -2,8 +2,39 @@ import {
   CAMERA_PROFILES, CLASS_PRESENTATION_PROFILES, IMPACT_PROFILES, MUSIC_CUES, MUSIC_STINGERS,
   PRESENTATION_FALLBACKS, SOUND_PROFILES, DESTRUCTIBLE_PROFILES, PLAYER_ACTION_PROFILES
 } from '../data/presentation.js';
+import { ANIMATION_SEMANTIC_STATES, HERO_MOTION_ASSETS, PLAYER_ANIMATION_CLIPS } from '../data/animation-v7.js';
 
 const issue = (severity, code, message, target = null) => ({ severity, code, message, target });
+
+export const validateV7AnimationData = () => {
+  const issues = [];
+  for (const [classId, asset] of Object.entries(HERO_MOTION_ASSETS)) {
+    if (!asset.required || !asset.src.startsWith('/assets/hero-motion-') || !asset.src.endsWith('-v7.png')) {
+      issues.push(issue('error', 'V7_ANIM_ASSET', `${classId} has an invalid required body asset.`, classId));
+    }
+    for (const semantic of ANIMATION_SEMANTIC_STATES) {
+      const clip = PLAYER_ANIMATION_CLIPS[`${classId}:${semantic}`];
+      if (!clip) {
+        issues.push(issue('error', 'V7_ANIM_CLIP', `${classId}:${semantic} is missing.`, classId));
+        continue;
+      }
+      if (!Array.isArray(clip.frameWindow) || clip.frameWindow.length !== 2 || clip.frameWindow.some((value) => !Number.isInteger(value) || value < 0 || value > 7)) {
+        issues.push(issue('error', 'V7_ANIM_CLIP', `${clip.id} has an invalid frame window.`, clip.id));
+      }
+      if (!clip.anchors?.body || !clip.anchors?.hand || !clip.anchors?.feet) {
+        issues.push(issue('error', 'V7_ANIM_ANCHOR', `${clip.id} is missing required anchors.`, clip.id));
+      }
+      if (clip.marker !== null && !(clip.marker >= 0 && clip.marker <= 1)) {
+        issues.push(issue('error', 'V7_ANIM_MARKER', `${clip.id} has invalid marker timing.`, clip.id));
+      }
+    }
+  }
+  return {
+    valid: !issues.some((entry) => entry.severity === 'error'),
+    issues,
+    summary: { assets: Object.keys(HERO_MOTION_ASSETS).length, clips: Object.keys(PLAYER_ANIMATION_CLIPS).length }
+  };
+};
 
 export const validatePresentationData = () => {
   const issues = [];
