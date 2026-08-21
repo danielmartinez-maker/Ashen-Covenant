@@ -27,4 +27,25 @@ assert.notEqual(
 const debug = resolver.debug();
 assert.ok(debug.hits >= 1 && debug.misses >= 2);
 
+const store = new Map();
+globalThis.localStorage = {
+  getItem: (key) => store.get(key) ?? null,
+  setItem: (key, value) => store.set(key, String(value)),
+  removeItem: (key) => store.delete(key)
+};
+const { GameEngine } = await import('../src/systems/game.js');
+const { GamePresentationSystem } = await import('../src/presentation/system.js');
+const input = {
+  pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {},
+  getMove() { return { x: 0, y: 0, moving: false }; }, getAimDirection() { return null; },
+  isHeld() { return false; }, consume() { return false; }, defer() {}, press() {}, rumble() {}
+};
+const game = new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 }, getAssetStatus: () => ({ ready: true, failed: [] }) }, { sound: false, reducedVfx: true });
+const presentation = new GamePresentationSystem(game, { input, settings: game.settings, audio: null, strictEvents: true });
+assert.equal(game.start('warden', 'thornseer'), true);
+game.player.equipment.weapon = { id: 'live-bell', slot: 'weapon', baseId: 'cleaver', rarity: 'unique', uniqueId: 'bell-sunder' };
+presentation.update(1 / 60);
+assert.equal(game.player.presentation.equipmentAppearance.signatureIds.includes('unique:bell-sunder'), true);
+assert.equal(presentation.getDebugSnapshot().equipmentAppearance.cache.size >= 1, true);
+
 console.log('Ashen Covenant v7 equipment appearance resolver regression passed.');
