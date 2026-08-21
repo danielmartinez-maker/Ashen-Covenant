@@ -118,6 +118,22 @@ hostile.player.inventory = Array.from({ length: 250 }, (_, index) => ({
 hostile.player.stash = hostile.player.inventory;
 hostile.player.equipment = { weapon: hostile.player.inventory[0], nonsense: hostile.player.inventory[1] };
 hostile.player.worldProgress = { zones: { gravewake: { corruption: 1e20, events: -5, liberated: 'yes' } }, discoveredDistricts: Array(500).fill('bogus') };
+hostile.player.worldV2 = {
+  tick: 'Infinity',
+  regions: {
+    gravewake: {
+      pressure: 'Infinity', resolvedCount: 'Infinity', failedCount: -999,
+      echoes: [{ typeId: 'gravewake-rising', modifiers: { hunterPressure: 'Infinity', bleedPower: 'Infinity', lootBias: ['grave'] }, outcome: 'bad', resolvedAt: 'Infinity' }]
+    }
+  },
+  activeEvents: [{
+    id: 'hostile-world-event', typeId: 'gravewake-rising', zoneId: 'gravewake',
+    startedAt: 'Infinity', elapsed: 'Infinity', duration: 'Infinity', progress: 'Infinity', target: 'Infinity',
+    modifiers: { enemyDensity: 'Infinity', hunterPressure: 'Infinity', bleedPower: 'Infinity', eliteRate: 'Infinity' }
+  }],
+  resolvedEvents: [{ id: 'resolved-hostile', typeId: 'gravewake-rising', zoneId: 'gravewake', resolvedAt: 'Infinity', outcome: 'bad' }],
+  procession: { eventId: 'hostile-world-event', zoneId: 'bogus', routeIndex: 'Infinity', travel: 'Infinity' }
+};
 hostile.player.contracts = { active: Array(100).fill({ id: 'bogus' }), offers: Array(100).fill({ id: 'bogus' }), seals: 1e99 };
 hostile.player.hunters = [null, {}, { id: '<bad>', level: 1e99, grudge: -1e99 }];
 store.set(SAVE_KEY, JSON.stringify(hostile));
@@ -130,6 +146,9 @@ assert.equal(hardened.player.level, MAX_LEVEL, 'oversized level clamped');
 assert.ok(hardened.player.gold >= 0, 'negative gold rejected');
 assert.ok(hardened.player.covenant.stage <= 5, 'covenant stage clamped');
 assert.ok(hardened.player.worldProgress.zones.gravewake.corruption <= 100, 'world corruption clamped');
+assert.ok(Number.isFinite(hardened.player.worldV2.tick), 'persistent world tick must be finite');
+assert.ok(Number.isFinite(hardened.player.worldV2.regions.gravewake.pressure), 'persistent world pressure must be finite');
+assert.ok(hardened.player.worldV2.regions.gravewake.pressure >= 0 && hardened.player.worldV2.regions.gravewake.pressure <= 5, 'persistent world pressure bounded');
 assert.equal(globalThis.__saveInjection, undefined, 'save text must not execute during engine restore');
 
 // Repeated save/restore must remain stable and finite.
