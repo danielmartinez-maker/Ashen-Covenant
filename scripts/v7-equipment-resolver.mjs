@@ -25,8 +25,32 @@ assert.notEqual(
   equipmentAppearanceRevisionKey(equipment, covenant),
   equipmentAppearanceRevisionKey({ ...equipment, weapon: { ...equipment.weapon, masterworkRank: 9 } }, covenant)
 );
+
+const accessoryOnly = {
+  amulet: {
+    id: 'accessory-bloodroot', slot: 'amulet', baseId: 'obelisk-charm', rarity: 'unique', uniqueId: 'bloodroot-idol',
+    masterwork: 12, corruption: 'Forbidden precision; Fractured armor'
+  },
+  ring: {
+    id: 'accessory-gutter', slot: 'ring', baseId: 'veilbreaker-ring', rarity: 'unique', uniqueId: 'gutter-star', masterwork: 4
+  }
+};
+const accessoryAppearance = resolver.resolve(accessoryOnly, covenant, { reducedVfx: false });
+assert.ok(accessoryAppearance.signatureIds.includes('unique:bloodroot-idol'), 'Unique amulets must preserve their authored visual signature');
+assert.ok(accessoryAppearance.signatureIds.includes('unique:gutter-star'), 'Unique rings must preserve their authored visual signature');
+assert.ok(accessoryAppearance.layers.some((layer) => layer.kind === 'signature' && layer.slot === 'amulet'), 'amulet identity must reach the bounded layer stack');
+assert.ok(accessoryAppearance.layers.some((layer) => layer.kind === 'signature' && layer.slot === 'ring'), 'ring identity must reach the bounded layer stack');
+assert.equal(accessoryAppearance.masterworkTier, 3, 'accessory Masterwork must contribute to aggregate appearance progression');
+assert.equal(accessoryAppearance.corruptionTier, 1, 'production text-form corruption must produce a visible corruption tier');
+assert.equal(accessoryAppearance.rarity, 'unique', 'accessory rarity must contribute to aggregate material identity');
+assert.notEqual(
+  equipmentAppearanceRevisionKey({}, covenant),
+  equipmentAppearanceRevisionKey(accessoryOnly, covenant),
+  'accessory identity must participate in cache invalidation'
+);
+
 const debug = resolver.debug();
-assert.ok(debug.hits >= 1 && debug.misses >= 2);
+assert.ok(debug.hits >= 1 && debug.misses >= 3);
 
 const store = new Map();
 globalThis.localStorage = {
