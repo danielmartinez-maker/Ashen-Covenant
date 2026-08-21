@@ -15,4 +15,11 @@ for (const asset of Object.values(HERO_MOTION_ASSETS)) {
   assert.equal(height % (asset.facingLanes * asset.sourceStates), 0, `${asset.id} height must fit ${asset.facingLanes * asset.sourceStates} rows`);
   assert.equal(bytes[25], 6, `${asset.id} must preserve alpha`);
 }
+
+const { validateV7AnimationData } = await import('../src/presentation/validator.js');
+const validation = validateV7AnimationData();
+assert.equal(validation.valid, true, validation.issues.map((entry) => `${entry.code}: ${entry.message}`).join('\n'));
+assert.equal(validation.summary.assets, 6);
+assert.equal(validation.summary.clips, 120);
+
 console.log('Ashen Covenant v7 hero animation asset regression passed.');
