@@ -2,6 +2,7 @@ import { clamp } from '../core/math.js';
 import { AnimationDirector } from './animation.js';
 import { AnimationClipResolver } from './animation-clips-v7.js';
 import { PresentationCombatContextResolver } from './combat-context-v7.js';
+import { EquipmentAppearanceResolver } from './equipment-appearance-v7.js';
 import { PresentationContextResolver } from './context.js';
 import { PresentationEventBus, bridgeLegacyPresentationEvents } from './event-bus.js';
 import { ImpactPresentationSystem } from './impact.js';
@@ -68,6 +69,7 @@ export class GamePresentationSystem {
     this.contextResolver = new PresentationContextResolver(this.eventBus);
     this.combatContextResolver = new PresentationCombatContextResolver();
     this.animationClipResolver = new AnimationClipResolver();
+    this.equipmentAppearanceResolver = new EquipmentAppearanceResolver();
     this.animationDirector = new AnimationDirector(this.eventBus, this.settings);
     this.impactSystem = new ImpactPresentationSystem(this.eventBus, input, this.settings);
     this.cinematic = new CinematicPresentationController(this.eventBus);
@@ -111,6 +113,11 @@ export class GamePresentationSystem {
       const resolvedClip = this.animationClipResolver.resolve(Object.freeze({ ...combatContext, locomotionProgress: presentation.locomotionProgress }));
       presentation.combatContext = combatContext;
       presentation.resolvedClip = resolvedClip;
+      presentation.equipmentAppearance = this.equipmentAppearanceResolver.resolve(
+        this.game.player.equipment,
+        this.game.player.covenantPresentation ?? combatContext.covenantIdentity,
+        { reducedVfx: this.settings.reducedVfx === true }
+      );
       const signature = `${resolvedClip.clipId}|${resolvedClip.row}|${resolvedClip.frame}`;
       if (signature !== this.lastResolvedClipSignature) {
         this.lastResolvedClipSignature = signature;
@@ -143,6 +150,7 @@ export class GamePresentationSystem {
     return {
       enabled: this.debugEnabled, context: this.getContext(), playerAnimation: this.game?.player?.animation ?? null,
       locomotion: this.game?.player?.presentation?.locomotion ?? null, resolvedClip: this.game?.player?.presentation?.resolvedClip ?? null,
+      equipmentAppearance: { cache: this.equipmentAppearanceResolver.debug(), currentKey: this.game?.player?.presentation?.equipmentAppearance?.key ?? null },
       animation: this.animationDirector.debug(), impact: this.impactSystem.debug(), cinematic: this.cinematic.debug(), audio: this.audio?.debug() ?? null,
       eventBus: { ...this.eventBus.stats, history: this.eventBus.recent(null, 8) },
       performance: { currentMs: this.updateCost, averageMs: average, p95Ms: p95, maximumMs: this.maxUpdateCost },
