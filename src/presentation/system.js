@@ -1,5 +1,7 @@
 import { clamp } from '../core/math.js';
 import { AnimationDirector } from './animation.js';
+import { AnimationClipResolver } from './animation-clips-v7.js';
+import { PresentationCombatContextResolver } from './combat-context-v7.js';
 import { PresentationContextResolver } from './context.js';
 import { PresentationEventBus, bridgeLegacyPresentationEvents } from './event-bus.js';
 import { ImpactPresentationSystem } from './impact.js';
@@ -100,9 +102,12 @@ export class GamePresentationSystem {
     this.audio = audio;
     this.eventBus = new PresentationEventBus({ strict: strictEvents });
     this.contextResolver = new PresentationContextResolver(this.eventBus);
+    this.combatContextResolver = new PresentationCombatContextResolver();
+    this.animationClipResolver = new AnimationClipResolver();
     this.animationDirector = new AnimationDirector(this.eventBus, this.settings);
     this.impactSystem = new ImpactPresentationSystem(this.eventBus, input, this.settings);
     this.cinematic = new CinematicPresentationController(this.eventBus);
+    this.lastResolvedClipSignature = '';
     this.musicOverride = null;
     this.characterClassOverride = null;
     this.animationOverride = null;
@@ -170,6 +175,19 @@ export class GamePresentationSystem {
     this.settingsController.normalize();
     const context = this.contextResolver.update(this.game, delta);
     this.animationDirector.update(this.game, delta, context);
+    if (this.game?.player) {
+      const combatContext = this.combatContextResolver.resolve(this.game, {}, { actor: this.game.player, eventType: 'frame' });
+      const resolvedClip = this.animationClipResolver.resolve(combatContext);
+      this.game.player.presentation ??= {};
+      this.game.player.presentation.combatContext = combatContext;
+      this.game.player.presentation.resolvedClip = resolvedClip;
+      const signature = `${resolvedClip.clipId}|${resolvedClip.row}|${resolvedClip.frame}`;
+      if (signature !== this.lastResolvedClipSignature) {
+        this.lastResolvedClipSignature = signature;
+        this.eventBus.emit('presentation:combat-context', combatContext, { time: this.game.clock, source: 'combat-context-v7' });
+        this.eventBus.emit('animation:clip-resolved', resolvedClip, { time: this.game.clock, source: 'animation-clips-v7' });
+      }
+    }
     this.impactSystem.update(this.game, delta, context);
     this.cinematic.update(this.game);
     this.audio?.update(context);
@@ -238,6 +256,7 @@ export class GamePresentationSystem {
       context: this.getContext(),
       playerAnimation: this.game?.player?.animation ?? null,
       locomotion: this.game?.player?.presentation?.locomotion ?? null,
+      resolvedClip: this.game?.player?.presentation?.resolvedClip ?? null,
       animation: this.animationDirector.debug(), impact: this.impactSystem.debug(), cinematic: this.cinematic.debug(),
       audio: this.audio?.debug() ?? null, eventBus: { ...this.eventBus.stats, history: this.eventBus.recent(null, 8) },
       performance: { currentMs: this.updateCost, averageMs: average, p95Ms: p95, maximumMs: this.maxUpdateCost },
