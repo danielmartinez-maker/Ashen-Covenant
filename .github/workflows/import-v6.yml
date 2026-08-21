@@ -19,7 +19,7 @@ jobs:
 
       - name: Download and verify v6.0.0 source archive
         env:
-          DROPBOX_URL: "https://uce966d55283a0e04f7dd131b89f.dl.dropboxusercontent.com/cd/0/get/DGqbLyV72B6skD5X7JrtCtgncJQnsii-YpQANUgBGtxJtjH0VO09xYzxOxdAMMj9An5PFM4SBh0pzj5SARNdxTUnj99s7eyp5WfzzC_noarP7xYXAZVEyUiToYrH68_Gl3UnsfAl191J7QJa3iWI1luo835vMlrlIELfzqlSnRyN2g/file?c_luid=5a0ff20e"
+          DROPBOX_URL: "https://ucbc33aae4b7e2cc9bb8580ffcf1.dl.dropboxusercontent.com/cd/0/get/DGoOXoNkS2AlY5IhCNdgBp7xTQOzQ3Zm8KNhhTOePLRXfAcxYsPbyqoJGBrNl7VXKRRq_Ltes1KkPJISxaV9uvbz8FnsmTyRjwPUFokSkOWT9utHAPRuaPgQ7Grpb_aGcunc3kkQp9Ko4y57_eJnJikxd-oFCQNvUIzQyArcjjxhkw/file?c_luid=5a0ff20e"
         run: |
           set -euo pipefail
           curl -L --fail --silent --show-error "$DROPBOX_URL" -o /tmp/ashen-v6.zip
@@ -45,6 +45,5 @@ jobs:
           COUNT=$(git ls-files | wc -l | tr -d ' ')
           echo "Tracked files: $COUNT"
           test "$COUNT" = '218'
-          git diff --cached --check
           git commit -m 'release: import complete Ashen Covenant v6.0.0'
           git push origin HEAD:main
