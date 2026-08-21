@@ -9500,6 +9500,16 @@ export class GameEngine {
   _restoreActiveOperation(operation) {
     const expedition = BLACK_ROAD_BY_ID[operation?.expeditionId];
     if (!expedition) return false;
+    const completedStageIds = Array.isArray(operation.completedStageIds)
+      ? [...new Set(operation.completedStageIds.filter((id) => expedition.stages.some((stage) => stage.id === id)))]
+      : [];
+    if (completedStageIds.length >= expedition.stages.length) {
+      const sanctuary = ZONES.find((entry) => entry.safe) ?? ZONES[0];
+      this.endgame = null;
+      this._moveBodyWithGeometry(this.player, sanctuary.x + sanctuary.width * 0.55, sanctuary.y + sanctuary.height * 0.58);
+      this.notify('An invalid Black Road checkpoint was released. You return to Ashen Sanctuary.', 'warning');
+      return false;
+    }
     this.entities.enemies = [];
     this.entities.projectiles = [];
     this.entities.hazards = [];
@@ -9510,7 +9520,6 @@ export class GameEngine {
     this.groupMemory.clear();
     this.worldEvent = null;
     this.encounter = { activeRoomId: null, activeGroupId: null, state: 'exploration', remaining: 0, total: 0, roomStreak: 0, announcedRoomId: null, clearedAt: 0 };
-    const completedStageIds = Array.isArray(operation.completedStageIds) ? operation.completedStageIds.filter((id) => expedition.stages.some((stage) => stage.id === id)) : [];
     this.endgame = {
       id: uid('black-road'), activity: 'black-road', name: expedition.name, expeditionId: expedition.id, zoneId: expedition.zoneId,
       tier: integer(operation.tier, 3, 1, 50),
