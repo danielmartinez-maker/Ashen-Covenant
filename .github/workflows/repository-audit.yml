@@ -35,3 +35,5 @@ jobs:
         run: node scripts/hunter-hardening-audit.mjs
       - name: Save-controlled UI string rendering audit
         run: node scripts/ui-save-string-hardening.mjs
+      - name: Legacy progression conversion audit
+        run: node scripts/progression-hardening-audit.mjs
