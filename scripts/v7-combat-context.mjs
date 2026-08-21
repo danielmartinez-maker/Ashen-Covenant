@@ -12,29 +12,26 @@ const player = {
     profile: { weapon: 'cleaver' },
     locomotion: { state: 'combat-run', speedRatio: 0.8, visualFacing: Math.PI / 2 },
     action: { elapsed: 0.31, phase: 'active', profile: { id: 'warden-attack-2', action: 'attack', duration: 0.62, comboIndex: 2 } }
-  },
-  covenantPresentation: Object.freeze({ affinity: 'grave', stage: 5, overlays: Object.freeze({ weapon: 'funeral-edge' }), audio: Object.freeze({ motif: 'drowned-bell' }) })
+  }
 };
 const target = { id: 'enemy-1', role: 'brute', x: 170, y: 200, material: 'plate', elite: true };
 const game = {
-  player, clock: 12.5, lastZoneId: 'gravewake',
+  player, clock: 12.5,
   settings: { reducedMotion: true, reducedFlashing: true, reducedVfx: true },
-  getHybrid: () => ({ id: 'briar-oath' }),
   getCovenantOverview: () => ({ primary: 'grave', secondary: 'blood', stage: 5, instability: 17, ruptureActive: false })
 };
 
 const resolver = new PresentationCombatContextResolver();
 const context = resolver.resolve(game, {
-  eventType: 'combat:attack-impact', actor: player, target, action: 'attack', comboIndex: 2,
+  action: 'attack', comboIndex: 2,
   hitWeight: 'heavy', damageType: 'physical', critical: true,
   hitResult: { guarded: true, guardBroken: true, poiseBroken: true, staggered: true, knockdown: false }
-});
+}, { actor: player, eventType: 'combat:attack-impact', target });
 
 assert.equal(Object.isFrozen(context), true);
 assert.equal(context.actorKind, 'player');
 assert.equal(context.primaryClass, 'warden');
 assert.equal(context.secondaryClass, 'thornseer');
-assert.equal(context.hybridId, 'briar-oath');
 assert.equal(context.actionId, 'attack');
 assert.equal(context.comboIndex, 2);
 assert.equal(context.phase, 'active');
@@ -42,16 +39,17 @@ assert.equal(context.actionProgress, 0.5);
 assert.equal(context.facingLane, 2);
 assert.equal(context.movementState, 'combat-run');
 assert.equal(context.contactMaterial, 'plate');
+assert.equal(context.eventType, 'combat:attack-impact');
 assert.equal(context.hitWeight, 'heavy');
 assert.equal(context.guardBroken, true);
 assert.equal(context.poiseBroken, true);
 assert.equal(context.staggered, true);
 assert.equal(context.critical, true);
-assert.equal(context.region, 'gravewake');
 assert.equal(context.covenantPrimary, 'grave');
 assert.equal(context.covenantSecondary, 'blood');
 assert.equal(context.covenantStage, 5);
 assert.equal(context.covenantInstability, 17);
+assert.equal(context.covenantIdentity.affinity, 'grave');
 assert.equal(context.settings.reducedMotion, true);
 assert.equal(context.settings.reducedFlashing, true);
 assert.equal(context.settings.reducedVfx, true);
