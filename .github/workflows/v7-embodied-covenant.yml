@@ -1,0 +1,47 @@
+name: V7 Embodied Covenant
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: V6 regression gate
+        run: npm run test:v6
+      - name: V7 context regression
+        shell: bash
+        run: |
+          if [ -f scripts/v7-combat-context.mjs ]; then
+            node scripts/v7-combat-context.mjs
+          fi
+      - name: V7 animation regression
+        shell: bash
+        run: |
+          if [ -f scripts/v7-animation-contract.mjs ]; then
+            node scripts/v7-animation-contract.mjs
+          fi
+      - name: V7 animation assets regression
+        shell: bash
+        run: |
+          if [ -f scripts/v7-animation-assets.mjs ]; then
+            node scripts/v7-animation-assets.mjs
+          fi
+      - name: V7 animation integration regression
+        shell: bash
+        run: |
+          if [ -f scripts/v7-animation-integration.mjs ]; then
+            node scripts/v7-animation-integration.mjs
+          fi
