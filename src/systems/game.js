@@ -4303,7 +4303,6 @@ export class GameEngine {
     player.resource = keepRatio ? clamp(player.resource / oldResource * player.maxResource, 0, player.maxResource) : clamp(player.resource, 0, player.maxResource);
     player.potions = clamp((player.potions ?? oldPotionCap) + Math.max(0, player.maxPotions - oldPotionCap), 0, player.maxPotions);
     const covenantView = this.getCovenantOverview();
-    player.equipmentPresentation = this.lootSystem.presentationForEquipment(player.equipment, covenantView);
     player.covenantPresentation = resolveCovenantPresentationIdentity(covenantView, {});
   }
 
