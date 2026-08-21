@@ -194,7 +194,9 @@ export class Renderer {
         : layer.slot === 'boots' ? anchors.feet
           : layer.slot === 'weapon' ? anchors.hand
             : layer.slot === 'offhand' ? anchors.offhand
-              : anchors.torso;
+              : layer.slot === 'amulet' ? anchors.torso
+                : layer.slot === 'ring' ? anchors.hand
+                  : anchors.torso;
       const offsetX = (anchor?.[0] ?? 0) * player.radius;
       const offsetY = (anchor?.[1] ?? 0) * player.radius;
       this.ctx.save();
