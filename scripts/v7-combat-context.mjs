@@ -54,8 +54,14 @@ assert.equal(context.settings.reducedMotion, true);
 assert.equal(context.settings.reducedFlashing, true);
 assert.equal(context.settings.reducedVfx, true);
 assert.equal(Object.isFrozen(context.visibleEquipment), true);
-assert.ok(context.visibleEquipment.some((item) => item.slot === 'weapon' && item.uniqueId === 'bell-sunder'));
-assert.ok(context.visualSignatureIds.includes('bell-sunder'));
+const visibleWeapon = context.visibleEquipment.find((item) => item.slot === 'weapon');
+assert.equal(visibleWeapon.uniqueId, 'bell-sunder');
+assert.equal(visibleWeapon.visualSignatureId, 'unique:bell-sunder');
+assert.equal(visibleWeapon.masterworkRank, 8);
+assert.equal(visibleWeapon.corruption, 2);
+assert.ok(context.visualSignatureIds.includes('unique:bell-sunder'));
+assert.equal(context.masterworkRank, 8, 'context derives maximum visible Masterwork rank');
+assert.equal(context.corruptionLevel, 2, 'context derives maximum visible corruption rank');
 
 const neutral = neutralPresentationCombatContext();
 assert.equal(Object.isFrozen(neutral), true);
