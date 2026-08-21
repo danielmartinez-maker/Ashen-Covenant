@@ -1,0 +1,35 @@
+name: Apply V7 Equipment Authority Cleanup
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v7-embodied-covenant
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/apply-v7-equipment-authority-cleanup.mjs
+      - name: Commit authority cleanup
+        shell: bash
+        run: |
+          if git diff --quiet -- src/systems/game.js src/systems/loot.js; then
+            echo "No equipment authority cleanup required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/systems/game.js src/systems/loot.js
+          git commit -m "refactor: move equipment appearance into presentation"
+          git push origin HEAD:v7-embodied-covenant
