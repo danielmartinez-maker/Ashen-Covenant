@@ -52,9 +52,9 @@ assert(game.snapshot().activeOperation?.blackRoad, 'an active Black Road operati
 const checkpointProbe = make();
 checkpointProbe.random = () => 0.1;
 assert(checkpointProbe.start('warden', 'thornseer'));
-const noncontiguousOperation = structuredClone(game.snapshot().activeOperation);
-noncontiguousOperation.completedStageIds = ['funeral-crypt'];
-assert(checkpointProbe._restoreActiveOperation(noncontiguousOperation), 'valid Black Road metadata with a corrupt completion ledger should still recover');
+const noncontiguousSnapshot = structuredClone(game.snapshot());
+noncontiguousSnapshot.activeOperation.completedStageIds = ['funeral-crypt'];
+checkpointProbe._restoreSnapshot(noncontiguousSnapshot);
 assert.deepEqual(
   checkpointProbe.endgame.completedStageIds,
   [],
