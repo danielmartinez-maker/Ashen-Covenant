@@ -1,6 +1,7 @@
 import { clamp } from '../core/math.js';
 import { AnimationDirector } from './animation.js';
 import { AnimationClipResolver } from './animation-clips-v7.js';
+import { AudioPresentationResolver } from './audio-resolver-v7.js';
 import { PresentationCombatContextResolver } from './combat-context-v7.js';
 import { EquipmentAppearanceResolver } from './equipment-appearance-v7.js';
 import { PresentationContextResolver } from './context.js';
@@ -73,6 +74,7 @@ export class GamePresentationSystem {
     this.eventBus = new PresentationEventBus({ strict: strictEvents });
     this.contextResolver = new PresentationContextResolver(this.eventBus);
     this.combatContextResolver = new PresentationCombatContextResolver();
+    this.audioResolver = new AudioPresentationResolver();
     this.animationClipResolver = new AnimationClipResolver();
     this.equipmentAppearanceResolver = new EquipmentAppearanceResolver();
     this.animationDirector = new AnimationDirector(this.eventBus, this.settings);
@@ -85,6 +87,42 @@ export class GamePresentationSystem {
   }
   attach(game) {
     if (!game) return; this.game = game; game.presentation = this; game.bindPresentation?.(this); this.impactSystem.attach(game); this.animationDirector.attach(game); this.audio?.attach(game, this.eventBus);
+  }
+  _entityById(id) {
+    if (id == null || !this.game) return null;
+    if (this.game.player?.id === id) return this.game.player;
+    for (const collection of Object.values(this.game.entities ?? {})) {
+      if (!Array.isArray(collection)) continue;
+      const match = collection.find((entity) => entity?.id === id);
+      if (match) return match;
+    }
+    return null;
+  }
+  _audioActorFor(event) {
+    const detail = event?.detail ?? {};
+    if (detail.actor && typeof detail.actor === 'object') return detail.actor;
+    if (detail.enemy && typeof detail.enemy === 'object') return detail.enemy;
+    const explicit = this._entityById(detail.entityId ?? detail.actorId ?? detail.sourceId);
+    if (explicit) return explicit;
+    if (['boss:signature-cue', 'combat:boss-stagger', 'legacy:boss-defeated'].includes(event?.type)) {
+      return this.game?.getBoss?.() ?? this.game?.entities?.enemies?.find((enemy) => enemy?.boss) ?? this.game?.player;
+    }
+    return this.game?.player ?? null;
+  }
+  _audioTargetFor(detail = {}) {
+    if (detail.target && typeof detail.target === 'object') return detail.target;
+    return this._entityById(detail.targetId ?? detail.victimId) ?? null;
+  }
+  _resolveAudioEvent(event) {
+    if (!event || !this.audioResolver) return null;
+    const actor = this._audioActorFor(event);
+    const target = this._audioTargetFor(event.detail);
+    const context = this.combatContextResolver.resolve(this.game, event.detail, { actor, target, eventType: event.type });
+    const resolved = this.audioResolver.resolve(event.type, event.detail, context, event.id);
+    if (!resolved) return null;
+    this.eventBus.emit('audio:semantic-resolved', resolved, { time: event.time, source: 'audio-resolver-v7', priority: resolved.priority });
+    this.audio?.playResolved?.(resolved);
+    return resolved;
   }
   _bindEvents() {
     this.eventBus.on('legacy:campaign-dialogue', (event) => this.cinematic.start(event.detail.id ?? 'campaign-dialogue', { kind: 'narrative', game: this.game }));
@@ -99,6 +137,10 @@ export class GamePresentationSystem {
     this.eventBus.on('legacy:boss-defeated', () => this.eventBus.emit('music:stinger', { id: 'boss-defeat' }, { time: this.game?.clock ?? 0, source: 'boss-presentation', priority: 98 }));
     this.eventBus.on('legacy:player-dead', () => { this.animationDirector.timeline.clear(this.game); this.cinematic.resetTransient(this.game); this.eventBus.emit('animation:death', { entityId: this.game?.player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 }); });
     this.eventBus.on('legacy:respawned', () => { this.animationDirector.timeline.clear(this.game); this.eventBus.emit('animation:resurrection', { entityId: this.game?.player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 }); });
+    [
+      'animation:footstep', 'combat:attack-start', 'combat:attack-impact', 'combat:enemy-telegraph', 'combat:enemy-impact',
+      'combat:boss-stagger', 'boss:signature-cue', 'loot:spawn', 'legacy:boss-defeated', 'legacy:sound'
+    ].forEach((type) => this.eventBus.on(type, (event) => this._resolveAudioEvent(event)));
     this.eventBus.on('presentation:error', (event) => { this.errorLog.push({ time: this.game?.clock ?? 0, ...event.detail }); this.errorLog.length = Math.min(40, this.errorLog.length); });
   }
   updateGameplay(delta) { if (!this.game?.player || this.game.state !== 'playing') return; this.animationDirector.updateGameplay(this.game, delta); }
