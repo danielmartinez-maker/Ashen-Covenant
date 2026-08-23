@@ -29,6 +29,18 @@ mods = world.modifiersForRegion(state, 'gravewake');
 assert(mods.resolvedCount >= 1, 'event outcomes must remain part of persistent regional state');
 assert(world.blackRoadModifiers(state, 'gravewake').lootBias.includes('grave'), 'regional state must feed Black Road reward pressure');
 
+// Corrupted procession state must normalize to one coherent route location. The
+// linked active event, procession zone, and route index may never disagree after load.
+const corruptedProcession = world.normalize({
+  tick: 90,
+  activeEvents: [{ id: 'world-black-procession-corrupt', typeId: 'black-procession', zoneId: 'redfen', startedAt: 0, elapsed: 90, duration: 360, progress: 2, target: 8 }],
+  procession: { eventId: 'world-black-procession-corrupt', zoneId: 'bellscar', routeIndex: 1, travel: 12 }
+});
+const linkedProcession = corruptedProcession.activeEvents.find((event) => event.id === corruptedProcession.procession?.eventId);
+assert(linkedProcession, 'normalized procession must retain its linked active event');
+assert.equal(corruptedProcession.procession.zoneId, linkedProcession.zoneId, 'procession zone must agree with linked active event after normalization');
+assert.equal(corruptedProcession.procession.routeIndex, ['gravewake', 'redfen', 'cairnreach', 'veiled-road', 'bellscar'].indexOf(corruptedProcession.procession.zoneId), 'procession route index must agree with normalized zone');
+
 const { GameEngine } = await import('../src/systems/game.js');
 const input = { pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; }, isHeld() { return false; }, consume() { return false; }, defer() {}, rumble() {} };
 const make = () => new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 } }, { reducedVfx: true });
