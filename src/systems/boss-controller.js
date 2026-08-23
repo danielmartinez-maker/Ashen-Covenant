@@ -50,7 +50,14 @@ export class BossController {
       enteredAt: changed ? now : previous?.enteredAt ?? now
     };
     this.states.set(enemy.id, state);
-    if (changed) this.domainEvents?.emit?.('boss:phase-changed', { bossId: enemy.id, enemyId: enemy.templateId, phase: phaseNumber, variantId });
+    if (changed) {
+      const currentIntermission = Number.isFinite(Number(enemy.phaseTransition)) ? Math.max(0, Number(enemy.phaseTransition)) : 0;
+      enemy.phaseTransition = Math.max(currentIntermission, phaseDef.intermission);
+      enemy.windupLeft = 0;
+      enemy.telegraph = null;
+      enemy.state = 'phase-transition';
+      this.domainEvents?.emit?.('boss:phase-changed', { bossId: enemy.id, enemyId: enemy.templateId, phase: phaseNumber, variantId });
+    }
     return state;
   }
 
