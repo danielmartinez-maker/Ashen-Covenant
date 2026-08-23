@@ -120,7 +120,7 @@ export class GamePresentationSystem {
       presentation.equipmentAppearance = this.equipmentAppearanceResolver.resolve(
         this.game.player.equipment,
         this.game.player.covenantPresentation ?? combatContext.covenantIdentity,
-        { reducedVfx: this.settings.reducedVfx === true }
+        { reducedVfx: this.settings.reducedVfx === true, facingLane: resolvedClip.facingLane }
       );
       const signature = `${resolvedClip.clipId}|${resolvedClip.row}|${resolvedClip.frame}`;
       if (signature !== this.lastResolvedClipSignature) {
