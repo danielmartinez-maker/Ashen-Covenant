@@ -6,6 +6,7 @@ import { resolveCovenantPresentationIdentity } from './covenant-identity.js';
 const FACING_STEP = Math.PI / 4;
 const freezeRecord = (value) => Object.freeze({ ...(value ?? {}) });
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const corruptionLevelFor = (item = {}) => {
   if (Number.isFinite(Number(item.corruptionRank))) return Math.max(0, Number(item.corruptionRank));
   if (Number.isFinite(Number(item.corruption))) return Math.max(0, Number(item.corruption));
@@ -13,6 +14,22 @@ const corruptionLevelFor = (item = {}) => {
 };
 const laneFor = (angle = 0) => ((Math.round(finite(angle) / FACING_STEP) % 8) + 8) % 8;
 const signatureIdFor = (item) => item?.visualSignatureId ?? (item?.uniqueId ? `unique:${item.uniqueId}` : null);
+const nonPlayerCovenantFor = (actor, detail) => {
+  if (isRecord(detail?.covenant)) return detail.covenant;
+  if (isRecord(detail?.covenantContext)) return detail.covenantContext;
+  if (isRecord(actor?.covenantPresentation)) {
+    return {
+      primary: actor.covenantPresentation.affinity ?? actor.covenantPresentation.primary ?? 'unbound',
+      secondary: actor.covenantPresentation.secondary ?? null,
+      stage: finite(actor.covenantPresentation.stage, 0),
+      instability: finite(actor.covenantPresentation.instability, 0),
+      ruptureActive: actor.covenantPresentation.ruptureActive === true,
+      effects: actor.covenantPresentation.effects
+    };
+  }
+  const bossAffinity = actor?.bossRuntime?.affinity;
+  return bossAffinity && bossAffinity !== 'base' ? { primary: bossAffinity, stage: 0 } : {};
+};
 
 export const neutralPresentationCombatContext = () => Object.freeze({
   actorId: null, actorKind: 'unknown', enemyRole: null, bossId: null, hunterId: null,
@@ -35,13 +52,15 @@ export class PresentationCombatContextResolver {
     try {
       if (!game || !actor) return neutralPresentationCombatContext();
       const player = game.player;
-      const action = actor === player ? player?.presentation?.action : null;
+      const playerActor = actor === player;
+      const action = actor.presentation?.action ?? null;
       const profile = action?.profile ?? {};
       const duration = Math.max(0.0001, finite(profile.duration, finite(actor?.animation?.duration, 1)));
       const elapsed = finite(action?.elapsed, duration - finite(actor?.animation?.time, duration));
-      const covenant = game.getCovenantOverview?.() ?? {};
+      const covenant = playerActor ? game.getCovenantOverview?.() ?? {} : nonPlayerCovenantFor(actor, detail);
       const covenantIdentity = resolveCovenantPresentationIdentity(covenant, { abilityId: detail.abilityId, mutationId: detail.mutationId });
-      const equipment = Object.values(player?.equipment ?? {}).filter(Boolean);
+      const equipmentRecord = isRecord(actor.equipment) ? actor.equipment : {};
+      const equipment = Object.values(equipmentRecord).filter((item) => isRecord(item));
       const visibleEquipment = equipment.map((item) => Object.freeze({
         id: item.id ?? null,
         slot: item.slot,
@@ -56,19 +75,21 @@ export class PresentationCombatContextResolver {
       const equippedCorruptionLevel = visibleEquipment.reduce((maximum, item) => Math.max(maximum, item.corruption), 0);
       const hit = detail.hitResult ?? detail.result ?? {};
       const zone = zoneAt(actor.x ?? player?.x ?? 0, actor.y ?? player?.y ?? 0);
-      const hybrid = player ? getHybrid(player.primary, player.secondary) : null;
+      const primaryClass = typeof actor.primary === 'string' ? actor.primary : null;
+      const secondaryClass = typeof actor.secondary === 'string' ? actor.secondary : null;
+      const hybrid = primaryClass && secondaryClass ? getHybrid(primaryClass, secondaryClass) : null;
       const context = {
         actorId: actor.id ?? null,
-        actorKind: actor === player ? 'player' : actor.boss ? 'boss' : actor.hunterId ? 'hunter' : 'enemy',
+        actorKind: playerActor ? 'player' : actor.boss ? 'boss' : actor.hunterId ? 'hunter' : 'enemy',
         enemyRole: actor.role ?? null, bossId: actor.boss ? actor.templateId ?? actor.id : null, hunterId: actor.hunterId ?? null,
-        primaryClass: player?.primary ?? null, secondaryClass: player?.secondary ?? null, hybridId: hybrid?.id ?? null,
+        primaryClass, secondaryClass, hybridId: hybrid?.id ?? null,
         actionId: detail.action ?? profile.action ?? actor.animation?.type ?? 'idle', profileId: detail.profileId ?? profile.id ?? actor.animation?.profileId ?? null,
         comboIndex: Math.max(0, Math.floor(finite(detail.comboIndex, profile.comboIndex ?? 0))), phase: detail.phase ?? action?.phase ?? 'idle',
         actionProgress: clamp(finite(detail.actionProgress, elapsed / duration), 0, 1), eventId: detail.eventId ?? null,
         facingLane: laneFor(actor.presentation?.visualFacing ?? actor.presentation?.locomotion?.visualFacing ?? actor.facing ?? 0), movementState: actor.presentation?.locomotion?.state ?? actor.state ?? 'idle',
         movementIntensity: clamp(finite(actor.presentation?.locomotion?.speedRatio, Math.hypot(actor.moveX ?? 0, actor.moveY ?? 0) / 250), 0, 1.5),
         elevation: Math.max(0, finite(actor.elevation, 0)), grounded: actor.grounded !== false, surface: actor.surface ?? 'stone', region: zone.id,
-        weaponFamily: player?.presentation?.profile?.weapon ?? null, offhandFamily: player?.equipment?.offhand?.baseId ?? null,
+        weaponFamily: actor.presentation?.profile?.weapon ?? null, offhandFamily: equipmentRecord.offhand?.baseId ?? null,
         visibleEquipment: Object.freeze(visibleEquipment), rarity: detail.rarity ?? 'common',
         corruptionLevel: Math.max(equippedCorruptionLevel, finite(detail.corruptionLevel, 0)),
         masterworkRank: Math.max(equippedMasterworkRank, finite(detail.masterworkRank, 0)),
