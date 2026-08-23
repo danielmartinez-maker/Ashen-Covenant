@@ -66,4 +66,16 @@ assert.equal(played.length, beforePickup + 1, 'game loot pickup events must reac
 assert.equal(played.at(-1)?.semanticId, 'loot-pickup', 'legacy loot bridge must resolve semantic pickup audio');
 assert.equal(played.at(-1)?.layers[0]?.bus, 'ui', 'loot pickup must use the UI bus');
 
+impactTarget.hunterId = 'hunter-audio-test';
+const beforeHunter = played.length;
+game.domainEvents.emit('hunter:intrusion', {
+  hunterId: impactTarget.hunterId,
+  enemyId: impactTarget.id,
+  zoneId: 'gravewake',
+  adaptations: []
+});
+assert.equal(played.length, beforeHunter + 1, 'gameplay Hunter intrusion must reach the required hunter-intrusion semantic family');
+assert.equal(played.at(-1)?.semanticId, 'hunter-intrusion', 'Hunter domain event must resolve Hunter intrusion audio');
+assert.equal(lastContextInputs.actor, impactTarget, 'Hunter intrusion audio must derive identity from the spawned Hunter actor');
+
 console.log('Ashen Covenant v7 audio orchestration regression passed.');
