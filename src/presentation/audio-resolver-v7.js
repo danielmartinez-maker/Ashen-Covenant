@@ -80,7 +80,14 @@ export const semanticAudioEventFor = (eventType, detail = {}, context = {}) => {
   if (eventType === 'combat:attack-start') return context.execution ? 'execution-start' : 'weapon-swing';
   if (eventType === 'combat:attack-impact') return context.execution ? 'execution-contact' : context.damageFamily === 'magic' ? 'spell-impact' : 'physical-impact';
   if (eventType === 'combat:enemy-telegraph') return context.actorKind === 'boss' ? 'boss-telegraph' : 'enemy-effort';
-  if (eventType === 'combat:enemy-impact') return 'physical-impact';
+  if (eventType === 'combat:enemy-impact') {
+    const role = context.enemyRole ?? detail.role;
+    if (role === 'ranged') return 'projectile-launch';
+    if (role === 'summoner') return 'summon';
+    if (role === 'commander') return 'enemy-command';
+    if (role === 'healer') return 'spell-cast';
+    return 'physical-impact';
+  }
   if (eventType === 'combat:boss-stagger') return 'boss-stagger';
   if (eventType === 'boss:signature-cue') return Number(detail.phase) > 1 ? 'boss-phase' : 'boss-signature';
   if (eventType === 'loot:spawn') return detail.rarity === 'unique' || detail.rarity === 'mythic' ? 'unique-reveal' : 'loot-drop';
