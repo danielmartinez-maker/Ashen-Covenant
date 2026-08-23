@@ -131,6 +131,15 @@ assert.ok(presentation.getContext().enemyThreatScore > 0);
 assert.ok(presentation.animationDirector.getAmbientActors({ playerInTown: true }).length >= 12);
 assert.ok(presentation.animationDirector.getAmbientActors({ playerInTown: false, strongholdState: 'liberated', currentRegion: 'gravewake' }).length >= 3);
 
+// A forced cinematic reset (for example player death) must release any active music duck.
+assert.ok(presentation.cinematic.start('forced-reset-test', { game }));
+const ducksBeforeReset = presentation.eventBus.recent('music:duck', 20).length;
+presentation.cinematic.resetTransient(game);
+assert.equal(presentation.cinematic.active, false);
+const ducksAfterReset = presentation.eventBus.recent('music:duck', 20);
+assert.ok(ducksAfterReset.length > ducksBeforeReset, 'forced cinematic reset must emit a duck release');
+assert.deepEqual(ducksAfterReset.at(-1).detail, { active: false, amount: 1 }, 'forced cinematic reset must restore normal music gain');
+
 presentation.cinematic.start('presentation-test', { game });
 assert.equal(presentation.cinematic.active, true);
 assert.ok(presentation.skipCinematic());
