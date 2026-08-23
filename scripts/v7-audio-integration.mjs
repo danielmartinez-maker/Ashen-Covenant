@@ -52,4 +52,12 @@ presentation.eventBus.emit('animation:footstep', {
 }, { time: game.clock, source: 'test' });
 assert.equal(played.filter((event) => event.semanticId === 'footstep').length, 1, 'footstep semantic audio must resolve once');
 
+const beforeAmbience = played.length;
+presentation.eventBus.emit('context:changed', {
+  currentRegion: presentation.getContext().currentRegion
+}, { time: game.clock, source: 'test-context' });
+assert.equal(played.length, beforeAmbience + 1, 'context changes must reach the required regional ambience semantic family');
+assert.equal(played.at(-1)?.semanticId, 'regional-ambience', 'context changes must resolve regional ambience');
+assert.equal(played.at(-1)?.layers[0]?.category, 'ambience', 'regional ambience must use the ambience voice budget');
+
 console.log('Ashen Covenant v7 audio orchestration regression passed.');
