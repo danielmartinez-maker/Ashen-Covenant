@@ -83,6 +83,18 @@ assert.deepEqual(
   'Black Road restore must keep each authored expedition bane at most once and discard unknown bane IDs'
 );
 
+// A truthy but malformed pending-route payload currently suppresses room spawn
+// on restore while offering no selectable route, producing a dead-end save.
+// Invalid junction state must fall back to the first unfinished authored room.
+const junctionRecoveryProbe = make();
+junctionRecoveryProbe.random = () => 0.1;
+assert(junctionRecoveryProbe.start('warden', 'thornseer'));
+const malformedJunctionSnapshot = structuredClone(game.snapshot());
+malformedJunctionSnapshot.activeOperation.pendingRoute = {};
+junctionRecoveryProbe._restoreSnapshot(malformedJunctionSnapshot);
+assert.equal(junctionRecoveryProbe.endgame.pendingRoute, null, 'malformed Black Road junction state must be discarded on restore');
+assert.equal(junctionRecoveryProbe.endgame.activeStage?.id, 'funeral-gate', 'discarding malformed junction state must respawn the first unfinished room');
+
 const frozenContext = JSON.parse(JSON.stringify(game.endgame.routeContext));
 game.save();
 const restored = make();
