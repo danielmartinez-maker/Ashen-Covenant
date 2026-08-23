@@ -56,8 +56,10 @@ export class AudioDirector {
     this.unsubscribers.forEach((unsubscribe) => unsubscribe?.());
     this.unsubscribers = [];
     if (presentationBus) {
-      this.unsubscribers.push(presentationBus.on('legacy:sound', (event) => this.play(event.detail.id, event.detail)));
-      this.unsubscribers.push(presentationBus.on('animation:footstep', (event) => this.playFootstep(event.detail)));
+      this.unsubscribers.push(presentationBus.on('legacy:sound', (event) => {
+        if (event.detail?.id === 'dodge') return;
+        this.play(event.detail.id, event.detail);
+      }));
     } else if (game?.on) this.unsubscribers.push(game.on('sound', ({ id, ...detail }) => this.play(id, detail)));
   }
 
@@ -103,6 +105,7 @@ export class AudioDirector {
     this.music = new AdaptiveMusicSystem(context, { ...this.buses, musicDuck: this.musicDuck }, this.settings, this.bus);
     this.noiseBuffer = this._makeNoiseBuffer();
     this._preloadCoreSamples();
+    void this.preloadV7Required();
     if (!this._visibilityBound && typeof document !== 'undefined') {
       this._visibilityBound = true;
       document.addEventListener('visibilitychange', () => this._applyFocusState());
