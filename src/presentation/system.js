@@ -160,7 +160,11 @@ export class GamePresentationSystem {
     this.eventBus.on('legacy:respawned', () => {
       this.animationDirector.timeline.clear(this.game);
       const player = this.game?.player;
-      if (player) player.animation = { type: 'resurrection', duration: 0.48, time: 0.48, angle: player.facing };
+      if (player) {
+        player.presentation ??= {};
+        player.presentation.reaction = null;
+        player.animation = { type: 'resurrection', duration: 0.48, time: 0.48, angle: player.facing };
+      }
       this.eventBus.emit('animation:resurrection', { entityId: player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 });
     });
     [
