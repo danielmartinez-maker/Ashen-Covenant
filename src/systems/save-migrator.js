@@ -11,6 +11,9 @@ const bounded = (value, min = 0, max = 100, fallback = 0) => Number.isFinite(Num
 const uniqueAllowedIds = (values, allowed) => Array.isArray(values)
   ? [...new Set(values.filter((id) => typeof id === 'string' && allowed.has(id)))]
   : [];
+const uniqueStrings = (values) => Array.isArray(values)
+  ? [...new Set(values.filter((id) => typeof id === 'string' && id.trim()))]
+  : [];
 
 export const defaultCovenantState = (raw = {}) => {
   const source = record(raw);
@@ -44,6 +47,26 @@ const migrateHunters = (player) => {
   }));
 };
 
+const normalizePendingRoute = (pendingRoute, completedStageIds, expeditionBoons, expedition, routeContext) => {
+  if (!pendingRoute || typeof pendingRoute !== 'object' || Array.isArray(pendingRoute)) return null;
+  const checkpoint = Number(pendingRoute.checkpoint);
+  if (!Number.isInteger(checkpoint) || checkpoint <= 0 || checkpoint >= expedition.stages.length || checkpoint !== completedStageIds.length) return null;
+
+  const ownedBoons = new Set(expeditionBoons);
+  const choices = uniqueAllowedIds(pendingRoute.choices, EXPEDITION_BOON_IDS).filter((id) => !ownedBoons.has(id));
+  const allowedMetamorphosis = new Set(uniqueStrings(routeContext?.metamorphosisChoiceIds));
+  const metamorphosisChoices = uniqueStrings(pendingRoute.metamorphosisChoices).filter((id) => allowedMetamorphosis.has(id));
+  if (!choices.length && !metamorphosisChoices.length) return null;
+
+  return {
+    checkpoint,
+    room: checkpoint + 1,
+    totalRooms: expedition.stages.length,
+    choices,
+    metamorphosisChoices
+  };
+};
+
 const normalizeActiveOperation = (operation) => {
   if (!operation || typeof operation !== 'object' || Array.isArray(operation)) return operation;
   const next = clone(operation);
@@ -64,6 +87,7 @@ const normalizeActiveOperation = (operation) => {
   next.completedStageIds = completedStageIds;
   next.expeditionBoons = uniqueAllowedIds(next.expeditionBoons, EXPEDITION_BOON_IDS);
   next.expeditionBanes = uniqueAllowedIds(next.expeditionBanes, EXPEDITION_BANE_IDS);
+  next.pendingRoute = normalizePendingRoute(next.pendingRoute, completedStageIds, next.expeditionBoons, expedition, next.routeContext);
   return next;
 };
 
