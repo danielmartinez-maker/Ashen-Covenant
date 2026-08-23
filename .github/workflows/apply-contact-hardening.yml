@@ -6,6 +6,11 @@ on:
       - v7-embodied-covenant
     paths:
       - .github/patch-requests/contact-hardening
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/patch-requests/contact-hardening
 
 permissions:
   contents: write
