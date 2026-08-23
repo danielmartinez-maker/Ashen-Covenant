@@ -2,6 +2,7 @@ const EVENT_TYPES = [
   'context:changed', 'context:intensity', 'animation:action-start', 'animation:phase', 'animation:event',
   'animation:action-end', 'animation:footstep', 'animation:reaction', 'animation:death', 'animation:resurrection',
   'combat:attack-start', 'combat:attack-impact', 'combat:enemy-telegraph', 'combat:enemy-impact', 'combat:boss-stagger',
+  'hunter:intrusion',
   'impact:request', 'camera:profile', 'camera:impulse', 'music:state', 'music:stinger', 'music:duck', 'boss:signature-cue',
   'cinematic:start', 'cinematic:end', 'cinematic:skip', 'loot:spawn', 'world:transition',
   'presentation:combat-context', 'animation:clip-resolved', 'audio:semantic-resolved', 'presentation:error'
