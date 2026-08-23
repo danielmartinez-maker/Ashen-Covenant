@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import { GameEngine } from '../src/systems/game.js';
+import { GamePresentationSystem } from '../src/presentation/system.js';
+
+const played = [];
+const audio = {
+  attach() {},
+  update() {},
+  playResolved(event) { played.push(event); return true; },
+  debug() { return { activeVoices: 0, categoryVoices: {} }; }
+};
+const input = {
+  pointer: { active: false, worldX: 0, worldY: 0 },
+  tick() {}, updateWorldPointer() {},
+  getMove() { return { x: 0, y: 0, moving: false }; },
+  getAimDirection() { return null; },
+  isHeld() { return false; }, consume() { return false; }, consumeUi() { return false; },
+  defer() {}, press() {}, hold() {}, release() {}, rumble() {}
+};
+const renderer = { viewport: { width: 1280, height: 720, scale: 1 }, getAssetStatus: () => ({ ready: true, failed: [] }) };
+const game = new GameEngine(input, renderer, { sound: true, reducedVfx: false });
+const presentation = new GamePresentationSystem(game, { input, settings: game.settings, audio, strictEvents: true });
+assert.equal(game.start('warden', 'thornseer'), true);
+
+presentation.eventBus.emit('combat:attack-impact', {
+  entityId: game.player.id,
+  critical: true,
+  hitResult: { weight: 'heavy', guardBroken: true },
+  damageType: 'physical',
+  material: 'plate'
+}, { time: game.clock, source: 'test' });
+
+assert.equal(played.length, 1, 'mapped live presentation events must resolve exactly once');
+assert.equal(played[0].semanticId, 'physical-impact');
+assert.ok(played[0].layers.some((layer) => layer.assetId === 'guard-break'));
+assert.equal(presentation.eventBus.recent('audio:semantic-resolved', 1).length, 1);
+
+presentation.eventBus.emit('animation:footstep', {
+  entityId: game.player.id, surface: 'stone', foot: 'left', speed: 0.7
+}, { time: game.clock, source: 'test' });
+assert.equal(played.filter((event) => event.semanticId === 'footstep').length, 1, 'footstep semantic audio must resolve once');
+
+console.log('Ashen Covenant v7 audio orchestration regression passed.');
