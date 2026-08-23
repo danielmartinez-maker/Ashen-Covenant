@@ -41,6 +41,15 @@ assert(linkedProcession, 'normalized procession must retain its linked active ev
 assert.equal(corruptedProcession.procession.zoneId, linkedProcession.zoneId, 'procession zone must agree with linked active event after normalization');
 assert.equal(corruptedProcession.procession.routeIndex, ['gravewake', 'redfen', 'cairnreach', 'veiled-road', 'bellscar'].indexOf(corruptedProcession.procession.zoneId), 'procession route index must agree with normalized zone');
 
+// A stale procession pointer without its active Black Procession event must not
+// survive normalization as a ghost route that continues moving across regions.
+const ghostProcession = world.normalize({
+  tick: 180,
+  activeEvents: [],
+  procession: { eventId: 'missing-procession-event', zoneId: 'cairnreach', routeIndex: 2, travel: 17 }
+});
+assert.equal(ghostProcession.procession, null, 'orphaned Procession state must be discarded during normalization');
+
 const { GameEngine } = await import('../src/systems/game.js');
 const input = { pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; }, isHeld() { return false; }, consume() { return false; }, defer() {}, rumble() {} };
 const make = () => new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 } }, { reducedVfx: true });
