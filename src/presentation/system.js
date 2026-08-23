@@ -136,7 +136,12 @@ export class GamePresentationSystem {
     });
     this.eventBus.on('legacy:boss-defeated', () => this.eventBus.emit('music:stinger', { id: 'boss-defeat' }, { time: this.game?.clock ?? 0, source: 'boss-presentation', priority: 98 }));
     this.eventBus.on('legacy:player-dead', () => { this.animationDirector.timeline.clear(this.game); this.cinematic.resetTransient(this.game); this.eventBus.emit('animation:death', { entityId: this.game?.player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 }); });
-    this.eventBus.on('legacy:respawned', () => { this.animationDirector.timeline.clear(this.game); this.eventBus.emit('animation:resurrection', { entityId: this.game?.player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 }); });
+    this.eventBus.on('legacy:respawned', () => {
+      this.animationDirector.timeline.clear(this.game);
+      const player = this.game?.player;
+      if (player) player.animation = { type: 'resurrection', duration: 0.48, time: 0.48, angle: player.facing };
+      this.eventBus.emit('animation:resurrection', { entityId: player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 });
+    });
     [
       'animation:footstep', 'combat:attack-start', 'combat:attack-impact', 'combat:enemy-telegraph', 'combat:enemy-impact',
       'combat:boss-stagger', 'boss:signature-cue', 'loot:spawn', 'legacy:boss-defeated', 'legacy:sound'
