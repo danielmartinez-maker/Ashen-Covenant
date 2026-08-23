@@ -1,5 +1,5 @@
 import { clamp } from '../core/math.js';
-import { AUDIO_ASSETS_V7, AUDIO_CATEGORY_BUDGETS, audioAsset } from '../data/audio-v7.js';
+import { AUDIO_ASSETS_V7, AUDIO_CATEGORY_BUDGETS, audioAsset, audioDefinition } from '../data/audio-v7.js';
 import { SOUND_PROFILES, SURFACE_AUDIO } from '../data/presentation.js';
 import { AdaptiveMusicSystem } from '../presentation/music.js';
 import { resolveAssetUrl } from '../core/assets.js';
@@ -40,6 +40,7 @@ export class AudioDirector {
     this.bus = null;
     this.game = null;
     this.lastSound = new Map();
+    this.lastResolvedSound = new Map();
     this.activeVoices = [];
     this.maxSfxVoices = MAX_SFX_VOICES;
     this.noiseBuffer = null;
@@ -259,6 +260,11 @@ export class AudioDirector {
   playResolved(resolved = {}) {
     if (!this.settings.sound || !this.context || this.context.state !== 'running' || !Array.isArray(resolved.layers) || !resolved.layers.length) return false;
     const now = this.context.currentTime;
+    const definition = audioDefinition(resolved.semanticId);
+    const concurrencyGroup = resolved.layers.find((layer) => layer?.concurrencyGroup)?.concurrencyGroup ?? definition?.concurrencyGroup ?? resolved.semanticId ?? 'general';
+    const cooldown = Math.max(0, Number(definition?.cooldown) || 0);
+    const last = this.lastResolvedSound.get(concurrencyGroup) ?? -Infinity;
+    if (now >= last && now - last < cooldown) return false;
     let played = false;
     for (const layer of resolved.layers.slice(0, 4)) {
       const assetId = layer?.assetId;
@@ -269,8 +275,8 @@ export class AudioDirector {
       }
       const priority = Number.isFinite(Number(layer.priority)) ? Number(layer.priority) : Number(resolved.priority) || 1;
       const category = layer.category ?? 'general';
-      const concurrencyGroup = layer.concurrencyGroup ?? resolved.semanticId ?? null;
-      if (!this._reserveVoices(1, priority, { category, concurrencyGroup })) continue;
+      const layerConcurrencyGroup = layer.concurrencyGroup ?? resolved.semanticId ?? null;
+      if (!this._reserveVoices(1, priority, { category, concurrencyGroup: layerConcurrencyGroup })) continue;
       const destination = this.buses[layer.bus] ?? this.buses.abilities;
       played = this._sample(
         now,
@@ -280,9 +286,10 @@ export class AudioDirector {
         layer.pitch ?? 1,
         clamp(Number(layer.gain ?? 1), 0, 1.5),
         layer.pan ?? 0,
-        { category, concurrencyGroup }
+        { category, concurrencyGroup: layerConcurrencyGroup }
       ) || played;
     }
+    if (played) this.lastResolvedSound.set(concurrencyGroup, now);
     return played;
   }
 
