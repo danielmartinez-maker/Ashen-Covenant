@@ -72,6 +72,31 @@ assert.equal(
   'resolving a normalized event must not leave a duplicate active event behind'
 );
 
+// A persistent event ID cannot be both active and terminal. If corrupted save
+// data contains the same identity in active and resolved histories, the terminal
+// record wins and any linked Procession pointer must be discarded.
+const lifecycleCollision = world.normalize({
+  tick: 120,
+  activeEvents: [
+    { id: 'world-lifecycle-collision', typeId: 'black-procession', zoneId: 'redfen', startedAt: 0, elapsed: 120, duration: 360, progress: 3, target: 8 }
+  ],
+  resolvedEvents: [
+    { id: 'world-lifecycle-collision', typeId: 'black-procession', zoneId: 'redfen', startedAt: 0, elapsed: 120, duration: 360, progress: 3, target: 8, resolved: true, failed: false, outcome: 'cleared', resolvedAt: 119 }
+  ],
+  procession: { eventId: 'world-lifecycle-collision', zoneId: 'redfen', routeIndex: 1, travel: 12 }
+});
+assert.equal(
+  lifecycleCollision.activeEvents.some((event) => event.id === 'world-lifecycle-collision'),
+  false,
+  'terminal persistent-event history must suppress an active record with the same ID'
+);
+assert.equal(
+  lifecycleCollision.resolvedEvents.filter((event) => event.id === 'world-lifecycle-collision').length,
+  1,
+  'terminal persistent-event identity must remain represented exactly once'
+);
+assert.equal(lifecycleCollision.procession, null, 'a terminal Black Procession event must not retain a live Procession route');
+
 const { GameEngine } = await import('../src/systems/game.js');
 const input = { pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; }, isHeld() { return false; }, consume() { return false; }, defer() {}, rumble() {} };
 const make = () => new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 } }, { reducedVfx: true });
