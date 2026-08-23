@@ -7,6 +7,14 @@ const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(
 const bounded = (value, fallback, min, max) => Math.max(min, Math.min(max, finite(value, fallback)));
 const integer = (value, fallback, min, max) => Math.floor(bounded(value, fallback, min, max));
 const safeText = (value, fallback = null, max = 120) => typeof value === 'string' && value.trim() ? value.slice(0, max) : fallback;
+const uniqueById = (values) => {
+  const seen = new Set();
+  return values.filter((entry) => {
+    if (!entry?.id || seen.has(entry.id)) return false;
+    seen.add(entry.id);
+    return true;
+  });
+};
 
 export const PERSISTENT_WORLD_EVENTS = Object.freeze({
   'gravewake-rising': Object.freeze({
@@ -100,8 +108,8 @@ export class WorldStateManager {
         lastEventId: safeText(saved.lastEventId, null, 120)
       };
     }
-    const activeEvents = safeArray(input.activeEvents).map((entry) => this.#normalizeEvent(entry)).filter(Boolean).slice(0, 16);
-    const resolvedEvents = safeArray(input.resolvedEvents).map((entry) => this.#normalizeResolvedEvent(entry)).filter(Boolean).slice(-40);
+    const activeEvents = uniqueById(safeArray(input.activeEvents).map((entry) => this.#normalizeEvent(entry)).filter(Boolean)).slice(0, 16);
+    const resolvedEvents = uniqueById(safeArray(input.resolvedEvents).map((entry) => this.#normalizeResolvedEvent(entry)).filter(Boolean)).slice(-40);
     const processionRaw = safeRecord(input.procession);
     let procession = null;
     if (input.procession && Object.keys(processionRaw).length) {
