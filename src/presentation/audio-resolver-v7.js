@@ -83,6 +83,7 @@ export const semanticAudioEventFor = (eventType, detail = {}, context = {}) => {
   if (eventType === 'combat:boss-stagger') return 'boss-stagger';
   if (eventType === 'boss:signature-cue') return Number(detail.phase) > 1 ? 'boss-phase' : 'boss-signature';
   if (eventType === 'loot:spawn') return detail.rarity === 'unique' || detail.rarity === 'mythic' ? 'unique-reveal' : 'loot-drop';
+  if (eventType === 'legacy:loot') return 'loot-pickup';
   if (eventType === 'legacy:boss-defeated') return 'boss-death';
   if (eventType === 'legacy:player-dead') return null;
   if (eventType === 'legacy:sound' && detail.id === 'dodge') return 'dodge';
