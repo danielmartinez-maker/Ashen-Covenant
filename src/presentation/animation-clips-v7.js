@@ -4,8 +4,8 @@ import { PLAYER_ANIMATION_CLIPS, clipById } from '../data/animation-v7.js';
 const semanticFor = (context) => {
   if (context.actionId === 'death') return 'death';
   if (context.knockdown) return 'knockdown';
-  if (context.staggered) return context.hitWeight === 'heavy' ? 'hit-heavy' : 'hit-light';
   if (context.execution) return 'execution';
+  if (context.staggered) return context.hitWeight === 'heavy' ? 'hit-heavy' : 'hit-light';
   if (context.actionId === 'dodge') return 'dodge';
   if (context.actionId === 'rise' || context.actionId === 'resurrection') return 'rise';
   if (context.actionId === 'attack') return `attack${Math.max(1, Math.min(3, Number(context.comboIndex) || 1))}`;
