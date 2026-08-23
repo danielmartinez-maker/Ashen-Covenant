@@ -152,7 +152,7 @@ export class GamePresentationSystem {
     });
     [
       'context:changed', 'animation:footstep', 'combat:attack-start', 'combat:attack-impact', 'combat:enemy-telegraph', 'combat:enemy-impact',
-      'combat:boss-stagger', 'boss:signature-cue', 'loot:spawn', 'legacy:boss-defeated', 'legacy:sound'
+      'combat:boss-stagger', 'boss:signature-cue', 'loot:spawn', 'legacy:loot', 'legacy:boss-defeated', 'legacy:sound'
     ].forEach((type) => this.eventBus.on(type, (event) => this._resolveAudioEvent(event)));
     this.eventBus.on('presentation:error', (event) => { this.errorLog.push({ time: this.game?.clock ?? 0, ...event.detail }); this.errorLog.length = Math.min(40, this.errorLog.length); });
   }
