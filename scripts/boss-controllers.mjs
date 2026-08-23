@@ -23,6 +23,13 @@ assert(state.intermission > 0);
 const sequence = Array.from({ length: 6 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index, phase: state.phase }, state).id);
 const repeated = Array.from({ length: 6 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index, phase: state.phase }, state).id);
 assert.deepEqual(sequence, repeated, 'boss sequence is deterministic');
+const phaseMechanics = BOSS_DEFINITIONS[boss.templateId].phases[state.phase - 1].mechanics;
+const launchedSequence = Array.from({ length: phaseMechanics.length + 1 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index + 1, phase: state.phase }, state).id);
+assert.deepEqual(
+  launchedSequence,
+  [...phaseMechanics, phaseMechanics[0]],
+  'runtime attackCount is incremented at windup start, so count 1 must select the first authored mechanic and wrap in authored order'
+);
 const voidState = controller.update({ ...boss, id: 'boss-void' }, { covenant: { primary: 'void' }, now: 3 });
 assert.notEqual(voidState.variantId, state.variantId, 'Covenant state can alter boss variant');
 assert(controller.nextMechanic(boss, voidState).tags.includes('void') || voidState.modifiers.length > 0);
