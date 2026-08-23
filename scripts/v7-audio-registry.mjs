@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   AUDIO_ASSETS_V7,
   AUDIO_CATEGORY_BUDGETS,
@@ -31,5 +34,19 @@ for (const [id, definition] of Object.entries(AUDIO_SEMANTIC_DEFINITIONS)) {
 }
 for (const affinity of ['flame', 'grave', 'blood', 'light', 'storm', 'void']) assert.ok(audioAsset(`cov-${affinity}`));
 assert.ok(Object.values(AUDIO_ASSETS_V7).some((asset) => asset.legacy === true), 'intentional v5 reuse must be explicit');
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+for (const asset of Object.values(AUDIO_ASSETS_V7).filter((entry) => !entry.legacy)) {
+  const file = path.join(root, 'public', asset.src.replace(/^\//, ''));
+  assert.equal(fs.existsSync(file), true, `${asset.id} must exist`);
+  const bytes = fs.readFileSync(file);
+  assert.equal(bytes.toString('ascii', 0, 4), 'RIFF');
+  assert.equal(bytes.toString('ascii', 8, 12), 'WAVE');
+  assert.equal(bytes.readUInt16LE(20), 1, `${asset.id} must use PCM`);
+  assert.equal(bytes.readUInt16LE(22), 1, `${asset.id} must be mono`);
+  assert.equal(bytes.readUInt32LE(24), 48000, `${asset.id} must be 48 kHz`);
+  assert.equal(bytes.readUInt16LE(34), 16, `${asset.id} must be 16-bit`);
+  assert.ok(bytes.length > 44 + 48000 * 2 * 0.05, `${asset.id} must contain audible data`);
+}
 
 console.log('Ashen Covenant v7 semantic audio registry regression passed.');
