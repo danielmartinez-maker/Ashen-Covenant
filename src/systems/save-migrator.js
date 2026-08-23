@@ -1,10 +1,16 @@
 import { BLACK_ROAD_BY_ID } from '../data/requiem.js';
+import { EXPEDITION_BANES, EXPEDITION_BOONS } from '../data/reforged.js';
 
 export const SAVE_SCHEMA_V19 = 19;
 const ALIGNMENTS = ['flame', 'grave', 'blood', 'light', 'storm', 'void'];
+const EXPEDITION_BOON_IDS = new Set(EXPEDITION_BOONS.map((entry) => entry.id));
+const EXPEDITION_BANE_IDS = new Set(EXPEDITION_BANES.map((entry) => entry.id));
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const clone = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
 const bounded = (value, min = 0, max = 100, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(min, Math.min(max, Number(value))) : fallback;
+const uniqueAllowedIds = (values, allowed) => Array.isArray(values)
+  ? [...new Set(values.filter((id) => typeof id === 'string' && allowed.has(id)))]
+  : [];
 
 export const defaultCovenantState = (raw = {}) => {
   const source = record(raw);
@@ -56,6 +62,8 @@ const normalizeActiveOperation = (operation) => {
     completedStageIds.push(stage.id);
   }
   next.completedStageIds = completedStageIds;
+  next.expeditionBoons = uniqueAllowedIds(next.expeditionBoons, EXPEDITION_BOON_IDS);
+  next.expeditionBanes = uniqueAllowedIds(next.expeditionBanes, EXPEDITION_BANE_IDS);
   return next;
 };
 
