@@ -108,8 +108,12 @@ export class WorldStateManager {
         lastEventId: safeText(saved.lastEventId, null, 120)
       };
     }
-    const activeEvents = uniqueById(safeArray(input.activeEvents).map((entry) => this.#normalizeEvent(entry)).filter(Boolean)).slice(0, 16);
-    const resolvedEvents = uniqueById(safeArray(input.resolvedEvents).map((entry) => this.#normalizeResolvedEvent(entry)).filter(Boolean)).slice(-40);
+    const normalizedResolvedEvents = uniqueById(safeArray(input.resolvedEvents).map((entry) => this.#normalizeResolvedEvent(entry)).filter(Boolean));
+    const terminalEventIds = new Set(normalizedResolvedEvents.map((event) => event.id));
+    const activeEvents = uniqueById(safeArray(input.activeEvents).map((entry) => this.#normalizeEvent(entry)).filter(Boolean))
+      .filter((event) => !terminalEventIds.has(event.id))
+      .slice(0, 16);
+    const resolvedEvents = normalizedResolvedEvents.slice(-40);
     const processionRaw = safeRecord(input.procession);
     let procession = null;
     if (input.procession && Object.keys(processionRaw).length) {
