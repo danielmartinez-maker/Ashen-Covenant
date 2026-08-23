@@ -126,9 +126,17 @@ export class GamePresentationSystem {
     }
     return this._entityById(detail.targetId ?? detail.victimId) ?? null;
   }
+  _enemyImpactHasContact(event, actor) {
+    if (event?.type !== 'combat:enemy-impact') return true;
+    const role = event.detail?.role ?? actor?.role;
+    if (!['melee', 'shield', 'brute'].includes(role)) return true;
+    if (!actor || typeof this.game?._playerInsideEnemyTelegraph !== 'function') return true;
+    return this.game._playerInsideEnemyTelegraph(actor);
+  }
   _resolveAudioEvent(event) {
     if (!event || !this.audioResolver) return null;
     const actor = this._audioActorFor(event);
+    if (!this._enemyImpactHasContact(event, actor)) return null;
     const target = this._audioTargetFor(event);
     const context = this.combatContextResolver.resolve(this.game, event.detail, { actor, target, eventType: event.type });
     const resolved = this.audioResolver.resolve(event.type, event.detail, context, event.id);
