@@ -113,7 +113,12 @@ export class GamePresentationSystem {
       presentation.actionProgress = action ? clamp(action.elapsed / Math.max(0.0001, action.profile.duration), 0, 1) : 0;
       const stride = Number(presentation.locomotion?.stride ?? 0);
       presentation.locomotionProgress = ((stride / (Math.PI * 2)) % 1 + 1) % 1;
-      const combatContext = this.combatContextResolver.resolve(this.game, { actionProgress: presentation.actionProgress }, { actor: this.game.player, eventType: 'frame' });
+      const combatContext = this.combatContextResolver.resolve(
+        this.game,
+        { actionProgress: action ? presentation.actionProgress : undefined },
+        { actor: this.game.player, eventType: 'frame' }
+      );
+      presentation.actionProgress = combatContext.actionProgress;
       const resolvedClip = this.animationClipResolver.resolve(Object.freeze({ ...combatContext, locomotionProgress: presentation.locomotionProgress }));
       presentation.combatContext = combatContext;
       presentation.resolvedClip = resolvedClip;
