@@ -60,4 +60,10 @@ assert.equal(played.length, beforeAmbience + 1, 'context changes must reach the 
 assert.equal(played.at(-1)?.semanticId, 'regional-ambience', 'context changes must resolve regional ambience');
 assert.equal(played.at(-1)?.layers[0]?.category, 'ambience', 'regional ambience must use the ambience voice budget');
 
+const beforePickup = played.length;
+game.emit('loot', { id: 'test-loot', rarity: 'rare', name: 'Test Relic' });
+assert.equal(played.length, beforePickup + 1, 'game loot pickup events must reach the required loot-pickup semantic family');
+assert.equal(played.at(-1)?.semanticId, 'loot-pickup', 'legacy loot bridge must resolve semantic pickup audio');
+assert.equal(played.at(-1)?.layers[0]?.bus, 'ui', 'loot pickup must use the UI bus');
+
 console.log('Ashen Covenant v7 audio orchestration regression passed.');
