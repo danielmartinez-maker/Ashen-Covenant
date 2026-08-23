@@ -1,8 +1,19 @@
+import { BLACK_ROAD_BY_ID } from '../data/requiem.js';
+import { EXPEDITION_BANES, EXPEDITION_BOONS } from '../data/reforged.js';
+
 export const SAVE_SCHEMA_V19 = 19;
 const ALIGNMENTS = ['flame', 'grave', 'blood', 'light', 'storm', 'void'];
+const EXPEDITION_BOON_IDS = new Set(EXPEDITION_BOONS.map((entry) => entry.id));
+const EXPEDITION_BANE_IDS = new Set(EXPEDITION_BANES.map((entry) => entry.id));
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const clone = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
 const bounded = (value, min = 0, max = 100, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(min, Math.min(max, Number(value))) : fallback;
+const uniqueAllowedIds = (values, allowed) => Array.isArray(values)
+  ? [...new Set(values.filter((id) => typeof id === 'string' && allowed.has(id)))]
+  : [];
+const uniqueStrings = (values) => Array.isArray(values)
+  ? [...new Set(values.filter((id) => typeof id === 'string' && id.trim()))]
+  : [];
 
 export const defaultCovenantState = (raw = {}) => {
   const source = record(raw);
@@ -36,10 +47,53 @@ const migrateHunters = (player) => {
   }));
 };
 
+const normalizePendingRoute = (pendingRoute, completedStageIds, expeditionBoons, expedition, routeContext) => {
+  if (!pendingRoute || typeof pendingRoute !== 'object' || Array.isArray(pendingRoute)) return null;
+  const checkpoint = Number(pendingRoute.checkpoint);
+  if (!Number.isInteger(checkpoint) || checkpoint <= 0 || checkpoint >= expedition.stages.length || checkpoint !== completedStageIds.length) return null;
+
+  const ownedBoons = new Set(expeditionBoons);
+  const choices = uniqueAllowedIds(pendingRoute.choices, EXPEDITION_BOON_IDS).filter((id) => !ownedBoons.has(id));
+  const allowedMetamorphosis = new Set(uniqueStrings(routeContext?.metamorphosisChoiceIds));
+  const metamorphosisChoices = uniqueStrings(pendingRoute.metamorphosisChoices).filter((id) => allowedMetamorphosis.has(id));
+  if (!choices.length && !metamorphosisChoices.length) return null;
+
+  return {
+    checkpoint,
+    room: checkpoint + 1,
+    totalRooms: expedition.stages.length,
+    choices,
+    metamorphosisChoices
+  };
+};
+
+const normalizeActiveOperation = (operation) => {
+  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) return operation;
+  const next = clone(operation);
+  if (next.blackRoad !== true) return next;
+  const expedition = BLACK_ROAD_BY_ID[next.expeditionId];
+  if (!expedition) return next;
+
+  const claimedStageIds = new Set(
+    Array.isArray(next.completedStageIds)
+      ? next.completedStageIds.filter((id) => typeof id === 'string')
+      : []
+  );
+  const completedStageIds = [];
+  for (const stage of expedition.stages) {
+    if (!claimedStageIds.has(stage.id)) break;
+    completedStageIds.push(stage.id);
+  }
+  next.completedStageIds = completedStageIds;
+  next.expeditionBoons = uniqueAllowedIds(next.expeditionBoons, EXPEDITION_BOON_IDS);
+  next.expeditionBanes = uniqueAllowedIds(next.expeditionBanes, EXPEDITION_BANE_IDS);
+  next.pendingRoute = normalizePendingRoute(next.pendingRoute, completedStageIds, next.expeditionBoons, expedition, next.routeContext);
+  return next;
+};
+
 export class SaveMigrator {
   static migrate(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return snapshot;
-    if (Number(snapshot.version) >= SAVE_SCHEMA_V19 && snapshot.player?.covenant && snapshot.player?.worldV2 && snapshot.player?.sanctuary && Array.isArray(snapshot.player?.hunters)) return clone(snapshot);
     const next = clone(snapshot);
     next.version = SAVE_SCHEMA_V19;
     next.player = record(next.player);
@@ -52,7 +106,7 @@ export class SaveMigrator {
       activeEvents: Array.isArray(player.worldV2?.activeEvents) ? clone(player.worldV2.activeEvents) : [],
       resolvedEvents: Array.isArray(player.worldV2?.resolvedEvents) ? clone(player.worldV2.resolvedEvents) : [],
       procession: player.worldV2?.procession ? clone(player.worldV2.procession) : null,
-      tick: Number(player.worldV2?.tick) || 0
+      tick: bounded(player.worldV2?.tick, 0, Number.MAX_SAFE_INTEGER, 0)
     };
     player.sanctuary = {
       level: Math.max(1, Math.min(5, Math.floor(Number(player.sanctuary?.level) || 1))),
@@ -63,11 +117,12 @@ export class SaveMigrator {
       discoveries: Array.isArray(player.sanctuary?.discoveries) ? clone(player.sanctuary.discoveries) : []
     };
     player.mutationProgress = {
-      credits: Math.max(0, Math.floor(Number(player.mutationProgress?.credits) || 0)),
+      credits: Math.floor(bounded(player.mutationProgress?.credits, 0, 1_000_000, 0)),
       selections: { ...record(player.mutationProgress?.selections) },
       unlocked: Array.isArray(player.mutationProgress?.unlocked) ? [...new Set(player.mutationProgress.unlocked)] : [],
       legacyConverted: player.mutationProgress?.legacyConverted === true
     };
+    if ('activeOperation' in next) next.activeOperation = normalizeActiveOperation(next.activeOperation);
     return next;
   }
 }

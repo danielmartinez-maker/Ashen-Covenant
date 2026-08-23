@@ -94,20 +94,6 @@ export class LootSystem {
     return hooks;
   }
 
-  presentationForEquipment(equipment = {}, covenant = null) {
-    const items = Object.values(equipment ?? {}).filter(Boolean);
-    const rank = { common: 0, magic: 1, rare: 2, relic: 3, unique: 4, mythic: 5 };
-    const hero = [...items].sort((a, b) => (rank[b.rarity] ?? 0) - (rank[a.rarity] ?? 0))[0] ?? null;
-    const weapon = items.find((item) => item.slot === 'weapon') ?? hero;
-    const crown = items.find((item) => item.uniqueId === 'drowned-sovereigns-crown');
-    return {
-      heroKey: hero?.uniqueId ?? hero?.setId ?? hero?.rarity ?? 'base',
-      weaponKey: weapon?.uniqueId === 'worldspine' ? 'worldspine-rupture' : weapon?.uniqueId ?? weapon?.baseId ?? 'base',
-      auraKey: crown ? 'drowned-sovereign-ward' : covenant?.primary ? `covenant-${covenant.primary}` : hero?.uniqueId ?? 'base',
-      rarity: hero?.rarity ?? 'common'
-    };
-  }
-
   applyBehavior(uniqueId, context = {}) {
     const behavior = this.behaviorFor(uniqueId);
     return behavior ? behavior.apply({ ...context, unique: uniqueById(uniqueId) }) : normalized([]);

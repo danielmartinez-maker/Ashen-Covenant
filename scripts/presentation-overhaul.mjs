@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/systems/game.js';
+import { AudioDirector } from '../src/systems/audio.js';
 import { GamePresentationSystem } from '../src/presentation/system.js';
 import { CLASS_PRESENTATION_PROFILES, DESTRUCTIBLE_PROFILES } from '../src/data/presentation.js';
 import { validatePresentationData, validatePresentationRuntime } from '../src/presentation/validator.js';
@@ -25,6 +26,21 @@ assert.equal(validation.summary.classes, 6);
 assert.equal(validation.summary.attacks, 18);
 assert.equal(validation.summary.actions, 10);
 assert.ok(validation.summary.cues >= 35);
+
+// V7's global SFX budget is 36 voices. Runtime admission and validation must agree.
+const audioBudgetProbe = new AudioDirector({ sound: false });
+assert.equal(audioBudgetProbe.maxSfxVoices, 36, 'AudioDirector must use the approved v7 global SFX budget');
+const runtimeBudgetGame = { player: { animation: {} }, hitStop: 0, camera: { x: 0, y: 0, zoom: 1 }, getBoss: () => null };
+const runtimeAtBudget = validatePresentationRuntime(runtimeBudgetGame, {
+  eventBus: { stats: { listenerErrors: 0 } },
+  audio: { debug: () => ({ activeVoices: 36 }) }
+});
+assert.equal(runtimeAtBudget.issues.some((entry) => entry.code === 'RUNTIME_SFX_BUDGET'), false, 'validator must allow the full v7 36-voice budget');
+const runtimeOverBudget = validatePresentationRuntime(runtimeBudgetGame, {
+  eventBus: { stats: { listenerErrors: 0 } },
+  audio: { debug: () => ({ activeVoices: 37 }) }
+});
+assert.equal(runtimeOverBudget.issues.some((entry) => entry.code === 'RUNTIME_SFX_BUDGET'), true, 'validator must warn above the v7 36-voice budget');
 
 // Weapon identities and their timing profiles must be mechanically distinct.
 assert.equal(new Set(Object.values(CLASS_PRESENTATION_PROFILES).map((profile) => profile.weapon)).size, 6);
@@ -119,6 +135,12 @@ presentation.requestImpact('critical', { x: game.player.x, y: game.player.y });
 assert.ok(game.hitStop > .02 && game.hitStop < .024, 'hit-stop accessibility scale must modify the shared impact profile');
 assert.ok(game.camera.flash <= .025, 'reduced flashing must constrain impact flash');
 
+// Invalid/zero impulse durations must never poison camera state with NaN.
+presentation.impactSystem.camera.impulses.length = 0;
+presentation.impactSystem.camera.impulse(5, 0, 0, game);
+presentation.impactSystem.camera.update(game, 1 / 60, { cameraProfile: 'exploration' });
+assert.ok(Number.isFinite(game.camera.presentationShake), 'zero-duration camera impulse must keep presentationShake finite');
+
 const destructible = game.entities.destructibles.find((entry) => entry.kind === 'urn');
 assert.ok(destructible && DESTRUCTIBLE_PROFILES.urn);
 game._damageDestructible(destructible, 1, 'test-strike');
@@ -130,6 +152,15 @@ assert.ok(presentation.getContext().nearbyEnemyCount >= 1);
 assert.ok(presentation.getContext().enemyThreatScore > 0);
 assert.ok(presentation.animationDirector.getAmbientActors({ playerInTown: true }).length >= 12);
 assert.ok(presentation.animationDirector.getAmbientActors({ playerInTown: false, strongholdState: 'liberated', currentRegion: 'gravewake' }).length >= 3);
+
+// A forced cinematic reset (for example player death) must release any active music duck.
+assert.ok(presentation.cinematic.start('forced-reset-test', { game }));
+const ducksBeforeReset = presentation.eventBus.recent('music:duck', 20).length;
+presentation.cinematic.resetTransient(game);
+assert.equal(presentation.cinematic.active, false);
+const ducksAfterReset = presentation.eventBus.recent('music:duck', 20);
+assert.ok(ducksAfterReset.length > ducksBeforeReset, 'forced cinematic reset must emit a duck release');
+assert.deepEqual(ducksAfterReset.at(-1).detail, { active: false, amount: 1 }, 'forced cinematic reset must restore normal music gain');
 
 presentation.cinematic.start('presentation-test', { game });
 assert.equal(presentation.cinematic.active, true);

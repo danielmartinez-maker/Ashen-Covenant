@@ -2,8 +2,65 @@ import {
   CAMERA_PROFILES, CLASS_PRESENTATION_PROFILES, IMPACT_PROFILES, MUSIC_CUES, MUSIC_STINGERS,
   PRESENTATION_FALLBACKS, SOUND_PROFILES, DESTRUCTIBLE_PROFILES, PLAYER_ACTION_PROFILES
 } from '../data/presentation.js';
+import { ANIMATION_SEMANTIC_STATES, HERO_MOTION_ASSETS, PLAYER_ANIMATION_CLIPS } from '../data/animation-v7.js';
+import { AUDIO_ASSETS_V7, AUDIO_CATEGORY_BUDGETS, AUDIO_REQUIRED_EVENT_FAMILIES, AUDIO_SEMANTIC_DEFINITIONS } from '../data/audio-v7.js';
 
 const issue = (severity, code, message, target = null) => ({ severity, code, message, target });
+
+export const validateV7AnimationData = () => {
+  const issues = [];
+  for (const [classId, asset] of Object.entries(HERO_MOTION_ASSETS)) {
+    if (!asset.required || !asset.src.startsWith('/assets/hero-motion-') || !asset.src.endsWith('-v7.png')) {
+      issues.push(issue('error', 'V7_ANIM_ASSET', `${classId} has an invalid required body asset.`, classId));
+    }
+    for (const semantic of ANIMATION_SEMANTIC_STATES) {
+      const clip = PLAYER_ANIMATION_CLIPS[`${classId}:${semantic}`];
+      if (!clip) {
+        issues.push(issue('error', 'V7_ANIM_CLIP', `${classId}:${semantic} is missing.`, classId));
+        continue;
+      }
+      if (!Array.isArray(clip.frameWindow) || clip.frameWindow.length !== 2 || clip.frameWindow.some((value) => !Number.isInteger(value) || value < 0 || value > 7)) {
+        issues.push(issue('error', 'V7_ANIM_CLIP', `${clip.id} has an invalid frame window.`, clip.id));
+      }
+      if (!clip.anchors?.body || !clip.anchors?.hand || !clip.anchors?.feet) {
+        issues.push(issue('error', 'V7_ANIM_ANCHOR', `${clip.id} is missing required anchors.`, clip.id));
+      }
+      if (clip.marker !== null && !(clip.marker >= 0 && clip.marker <= 1)) {
+        issues.push(issue('error', 'V7_ANIM_MARKER', `${clip.id} has invalid marker timing.`, clip.id));
+      }
+    }
+  }
+  return {
+    valid: !issues.some((entry) => entry.severity === 'error'),
+    issues,
+    summary: { assets: Object.keys(HERO_MOTION_ASSETS).length, clips: Object.keys(PLAYER_ANIMATION_CLIPS).length }
+  };
+};
+
+export const validateV7AudioData = () => {
+  const issues = [];
+  for (const id of AUDIO_REQUIRED_EVENT_FAMILIES) {
+    const definition = AUDIO_SEMANTIC_DEFINITIONS[id];
+    if (!definition) {
+      issues.push(issue('error', 'V7_AUDIO_DEFINITION', `${id} is missing.`, id));
+      continue;
+    }
+    if (definition.maxLayers < 1 || definition.maxLayers > 4) issues.push(issue('error', 'V7_AUDIO_LAYERS', `${id} has invalid layer budget.`, id));
+    for (const assetId of definition.assets ?? []) {
+      if (!AUDIO_ASSETS_V7[assetId]) issues.push(issue('error', 'V7_AUDIO_ASSET_REF', `${id} references missing ${assetId}.`, id));
+    }
+  }
+  for (const asset of Object.values(AUDIO_ASSETS_V7)) {
+    if (!asset.src.startsWith('/assets/audio/')) issues.push(issue('error', 'V7_AUDIO_PATH', `${asset.id} has invalid asset path.`, asset.id));
+    if (asset.legacy && !asset.src.startsWith('/assets/audio/v5/')) issues.push(issue('error', 'V7_AUDIO_LEGACY', `${asset.id} legacy path is not explicit v5.`, asset.id));
+    if (!asset.legacy && !asset.src.startsWith('/assets/audio/v7/')) issues.push(issue('error', 'V7_AUDIO_PATH', `${asset.id} v7 path is invalid.`, asset.id));
+  }
+  return {
+    valid: !issues.some((entry) => entry.severity === 'error'),
+    issues,
+    summary: { semanticEvents: AUDIO_REQUIRED_EVENT_FAMILIES.length, assets: Object.keys(AUDIO_ASSETS_V7).length }
+  };
+};
 
 export const validatePresentationData = () => {
   const issues = [];
@@ -95,6 +152,24 @@ export const validatePresentationRuntime = (game, presentation) => {
   if (game?.hitStop < 0 || !Number.isFinite(game?.hitStop ?? 0)) issues.push(issue('error', 'RUNTIME_INVALID_HITSTOP', 'Hit stop became invalid.'));
   if (game?.camera && (![game.camera.x, game.camera.y, game.camera.zoom].every(Number.isFinite) || game.camera.zoom <= 0)) issues.push(issue('error', 'RUNTIME_INVALID_CAMERA', 'Camera state became invalid.'));
   if ((presentation?.eventBus?.stats?.listenerErrors ?? 0) > 0) issues.push(issue('error', 'RUNTIME_EVENT_ERROR', 'A presentation listener raised an error.'));
-  if (presentation?.audio?.debug?.().activeVoices > 32) issues.push(issue('warning', 'RUNTIME_SFX_BUDGET', 'SFX voice budget was exceeded.'));
+  const audioDebug = presentation?.audio?.debug?.();
+  const failedSamples = presentation?.audio?.sampleFailures;
+  const requiredAudioFailures = failedSamples && typeof failedSamples[Symbol.iterator] === 'function'
+    ? [...failedSamples].filter((id) => AUDIO_ASSETS_V7[id]?.required === true)
+    : [];
+  if (requiredAudioFailures.length) {
+    issues.push(issue(
+      'error',
+      'RUNTIME_V7_AUDIO_REQUIRED_LOAD',
+      `Required v7 audio failed to load/decode: ${requiredAudioFailures.join(', ')}.`,
+      requiredAudioFailures[0]
+    ));
+  }
+  if ((audioDebug?.activeVoices ?? 0) > AUDIO_CATEGORY_BUDGETS.total) issues.push(issue('warning', 'RUNTIME_SFX_BUDGET', 'SFX voice budget was exceeded.'));
+  for (const [category, cap] of Object.entries(AUDIO_CATEGORY_BUDGETS)) {
+    if (category === 'total') continue;
+    const count = audioDebug?.categoryVoices?.[category] ?? 0;
+    if (count > cap) issues.push(issue('warning', 'RUNTIME_SFX_CATEGORY_BUDGET', `${category} SFX voice budget was exceeded (${count}/${cap}).`, category));
+  }
   return { valid: !issues.some((entry) => entry.severity === 'error'), issues };
 };

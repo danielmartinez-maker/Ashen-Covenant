@@ -18,10 +18,10 @@ export class CameraPresentationController {
   }
 
   impulse(amount, duration = 0.16, direction = 0, game = null) {
-    if (!Number.isFinite(amount) || amount <= 0) return;
-    this.impulses.push({ amount, duration, time: duration, direction });
+    if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(duration) || duration <= 0) return;
+    this.impulses.push({ amount, duration, time: duration, direction: Number.isFinite(direction) ? direction : 0 });
     if (this.impulses.length > 8) this.impulses.splice(0, this.impulses.length - 8);
-    this.bus?.emit('camera:impulse', { amount, duration, direction }, { time: game?.clock ?? 0, source: 'camera-controller' });
+    this.bus?.emit('camera:impulse', { amount, duration, direction: Number.isFinite(direction) ? direction : 0 }, { time: game?.clock ?? 0, source: 'camera-controller' });
   }
 
   update(game, delta, context) {

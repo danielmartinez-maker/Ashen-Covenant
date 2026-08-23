@@ -23,12 +23,34 @@ assert(state.intermission > 0);
 const sequence = Array.from({ length: 6 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index, phase: state.phase }, state).id);
 const repeated = Array.from({ length: 6 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index, phase: state.phase }, state).id);
 assert.deepEqual(sequence, repeated, 'boss sequence is deterministic');
-const voidState = controller.update({ ...boss, id: 'boss-void' }, { covenant: { primary: 'void' }, now: 3 });
+const phaseMechanics = BOSS_DEFINITIONS[boss.templateId].phases[state.phase - 1].mechanics;
+const launchedSequence = Array.from({ length: phaseMechanics.length + 1 }, (_, index) => controller.nextMechanic({ ...boss, attackCount: index + 1, phase: state.phase }, state).id);
+assert.deepEqual(
+  launchedSequence,
+  [...phaseMechanics, phaseMechanics[0]],
+  'runtime attackCount is incremented at windup start, so count 1 must select the first authored mechanic and wrap in authored order'
+);
+
+// A boss can spend an arbitrary number of attacks in phase 1. Entering a new
+// authored phase must still begin at that phase's opener without resetting the
+// lifetime attack counter used by legacy cadence and Covenant affinity effects.
+const phaseEntryBoss = { id: 'boss-phase-entry', templateId: 'cryptwarden', boss: true, maxHp: 1000, hp: 1000, attackCount: 5, phase: 1 };
+controller.update(phaseEntryBoss, { covenant: { primary: 'grave' }, now: 3 });
+phaseEntryBoss.hp = 600;
+const phaseEntryState = controller.update(phaseEntryBoss, { covenant: { primary: 'grave' }, now: 4 });
+const phaseEntryMechanics = BOSS_DEFINITIONS[phaseEntryBoss.templateId].phases[phaseEntryState.phase - 1].mechanics;
+assert.equal(
+  controller.nextMechanic({ ...phaseEntryBoss, attackCount: 6 }, phaseEntryState).id,
+  phaseEntryMechanics[0],
+  'first attack launched after a phase transition must start at the new phase authored opener regardless of lifetime attack count'
+);
+
+const voidState = controller.update({ ...boss, id: 'boss-void' }, { covenant: { primary: 'void' }, now: 5 });
 assert.notEqual(voidState.variantId, state.variantId, 'Covenant state can alter boss variant');
 assert(controller.nextMechanic(boss, voidState).tags.includes('void') || voidState.modifiers.length > 0);
 
 const blackRoadBoss = { id: 'black-road-crypt', templateId: 'cryptwarden', boss: true, maxHp: 1000, hp: 300, attackCount: 0, phase: 2 };
-assert.equal(controller.update(blackRoadBoss, { covenant: {}, now: 5 }).phase, 3, 'Funeral Road legacy final-phase boundary is 30% HP');
+assert.equal(controller.update(blackRoadBoss, { covenant: {}, now: 6 }).phase, 3, 'Funeral Road legacy final-phase boundary is 30% HP');
 
 console.log('Ashen Covenant authored BossController regression passed.');
 
@@ -45,12 +67,19 @@ const liveBoss = game._spawnEnemy('cryptwarden', game.player.x + 140, game.playe
 assert(liveBoss?.boss);
 let livePhase = null;
 const offPhase = game.domainEvents.on('boss:phase-changed', (detail) => { livePhase = detail; });
-liveBoss.hp = liveBoss.maxHp * 0.55;
+liveBoss.hp = liveBoss.maxHp * .55;
+liveBoss.windupLeft = .5;
+liveBoss.telegraph = { targetX: game.player.x, targetY: game.player.y, angle: 0 };
+liveBoss.state = 'windup';
 game._updateBossPhase(liveBoss);
 offPhase();
 assert.equal(liveBoss.phase, 2);
 assert.equal(livePhase?.enemyId, 'cryptwarden');
 assert.equal(liveBoss.bossRuntime.variantId, 'grave-bound');
+assert.ok(liveBoss.phaseTransition > 0, 'gameplay must own boss phase intermission even without a presentation system');
+assert.equal(liveBoss.windupLeft, 0, 'gameplay phase transition must cancel an in-flight windup');
+assert.equal(liveBoss.telegraph, null, 'gameplay phase transition must clear the prior telegraph');
+assert.equal(liveBoss.state, 'phase-transition', 'gameplay phase transition must lock the boss state before presentation runs');
 const beforeEffects = game.entities.hazards.length + game.entities.projectiles.length;
 liveBoss.attackCount = 0;
 liveBoss.telegraph = { targetX: game.player.x, targetY: game.player.y, angle: 0 };

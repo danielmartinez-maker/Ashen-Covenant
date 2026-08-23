@@ -3,6 +3,8 @@ import { DISTRICTS } from '../data/expansion.js';
 import { ENCOUNTER_ROOMS } from '../data/requiem.js';
 import { ZONES, zoneAt } from '../data/world.js';
 import { ACTION_VFX_FRAME_COUNT, ACTION_VFX_SHEETS } from '../data/action-vfx.js';
+import { HERO_MOTION_ASSETS } from '../data/animation-v7.js';
+import { EQUIPMENT_LAYER_ASSETS } from '../data/equipment-appearance-v7.js';
 import { covenantVfxPhase } from '../presentation/covenant-identity.js';
 import { clamp, easeOutCubic, fromAngle } from '../core/math.js';
 import { resolveAssetUrl } from '../core/assets.js';
@@ -21,9 +23,7 @@ const rgba = (hex, alpha = 1) => {
 // The hero is presented as a 2.5D character, not a rotatable top-down token.
 // Each class now resolves through eight authored/derived three-quarter views. Combat can still aim in
 // the plane, while the body remains locked to grounded 45-degree facing stances.
-const PLAYER_ROWS = { ironbound: 0, thornseer: 1, warden: 2, veilrunner: 3, gravebinder: 4, dawnstrider: 5 };
 const PLAYER_FACING_ANGLES = [0, Math.PI * .25, Math.PI * .5, Math.PI * .75, Math.PI, -Math.PI * .75, -Math.PI * .5, -Math.PI * .25];
-const HERO_MOTION_STATES = Object.freeze({ idle: 0, run: 1, attack1: 2, attack2: 3, attack3: 4, cast: 5, ward: 5, companion: 5, hybrid: 5, dodge: 6, hit: 7, death: 8, execution: 4, ultimate: 9, potion: 5, resurrection: 9 });
 const ENEMY_SPRITES = {
   mireling: ['a', 1], ashbow: ['a', 2], cairnguard: ['a', 0], cinderbrute: ['b', 3], candlepriest: ['a', 3],
   riftstalker: ['d', 2], echomonk: ['d', 0], bonevulture: ['d', 3], chainwidow: ['d', 2], wardeater: ['d', 3],
@@ -67,18 +67,19 @@ export class Renderer {
     this.assetState = { pending: 0, loaded: 0, failed: new Map() };
     this.assetPromises = [];
     this.assets = {
-      heroes: this._loadImage('/assets/hero-facing-atlas-v5.png'),
+      heroMotion: Object.fromEntries(Object.entries(HERO_MOTION_ASSETS).map(([classId, asset]) => [classId, this._loadImage(asset.src)])),
       enemyMotion: {
         a: this._loadImage('/assets/enemy-motion-a-v7.png'),
         b: this._loadImage('/assets/enemy-motion-b-v7.png'),
         c: this._loadImage('/assets/enemy-motion-c-v7.png'),
         d: this._loadImage('/assets/enemy-motion-d-v7.png')
       },
-      heroMotion: new Map(),
       props: this._loadImage('/assets/environment-props-v5.png'),
       entrances: this._loadImage('/assets/entrance-atlas-v5.png'),
       npcs: this._loadImage('/assets/npc-atlas-v5.png'),
       actionVfx: Object.fromEntries(Object.entries(ACTION_VFX_SHEETS).map(([id, sheet]) => [id, this._loadImage(sheet.src)])),
+      equipmentLayers: this._loadImage(EQUIPMENT_LAYER_ASSETS.layers.src),
+      equipmentSignatures: this._loadImage(EQUIPMENT_LAYER_ASSETS.signatures.src),
       items: this._loadImage('/assets/item-atlas-v2.png'),
       terrain: this._loadImage(TERRAIN_ATLAS)
     };
@@ -114,7 +115,7 @@ export class Renderer {
   }
 
   getAssetStatus() {
-    const required = [this.assets.heroes, ...Object.values(this.assets.enemyMotion), ...Object.values(this.assets.actionVfx), this.assets.props, this.assets.entrances, this.assets.npcs, this.assets.items, this.assets.terrain];
+    const required = [...Object.values(this.assets.heroMotion), ...Object.values(this.assets.enemyMotion), ...Object.values(this.assets.actionVfx), this.assets.equipmentLayers, this.assets.equipmentSignatures, this.assets.props, this.assets.entrances, this.assets.npcs, this.assets.items, this.assets.terrain];
     return {
       ready: this.assetState.pending === 0 && this.assetState.failed.size === 0 && required.every((image) => this._assetReady(image)),
       pending: this.assetState.pending,
@@ -145,20 +146,6 @@ export class Renderer {
     }));
   }
 
-  _loadOptionalImage(src) {
-    if (typeof Image === 'undefined') return null;
-    const image = new Image();
-    image.decoding = 'async';
-    image.src = resolveAssetUrl(src);
-    return image;
-  }
-
-  _heroMotionImage(classId) {
-    if (!classId) return null;
-    if (!this.assets.heroMotion.has(classId)) this.assets.heroMotion.set(classId, this._loadOptionalImage(`/assets/hero-motion-${classId}-v7.png`));
-    return this.assets.heroMotion.get(classId);
-  }
-
   _assetReady(image) {
     return Boolean(image && image.complete !== false && (image.naturalWidth || image.width) && (image.naturalHeight || image.height));
   }
@@ -171,6 +158,53 @@ export class Renderer {
     const row = Math.floor(index / columns);
     this.ctx.drawImage(image, column * cellWidth, row * cellHeight, cellWidth, cellHeight, x - width / 2, y - height / 2, width, height);
     return true;
+  }
+
+  _drawCovenantEquipmentTreatment(player, game, layer) {
+    const palette = { flame: '#e97643', grave: '#a993c7', blood: '#c74d62', light: '#f0d789', storm: '#7fbbe5', void: '#8b74b6' };
+    const color = palette[layer.family] ?? game.getHybrid?.()?.color ?? '#c9b88e';
+    const pulse = 1 + Math.sin((game.clock ?? 0) * 2.6) * .04;
+    this.ctx.save();
+    this.ctx.globalCompositeOperation = layer.blend ?? 'screen';
+    this.ctx.globalAlpha = clamp(Number(layer.opacity) || 0, 0, 1);
+    this.ctx.strokeStyle = color;
+    this.ctx.lineWidth = 1.5;
+    this.ctx.setLineDash([6, 7]);
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, player.radius * .12, player.radius * 1.15 * pulse, player.radius * .82 * pulse, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
+    this.ctx.restore();
+  }
+
+  _drawEquipmentLayers(player, game, minOrder, maxOrder) {
+    const appearance = player.presentation?.equipmentAppearance;
+    if (!appearance?.layers?.length) return;
+    const anchors = player.presentation?.resolvedClip?.anchors ?? {};
+    for (const layer of appearance.layers) {
+      if (layer.order < minOrder || layer.order > maxOrder) continue;
+      if (layer.kind === 'covenant') {
+        this._drawCovenantEquipmentTreatment(player, game, layer);
+        continue;
+      }
+      const signature = layer.assetId === EQUIPMENT_LAYER_ASSETS.signatures.id;
+      const image = signature ? this.assets.equipmentSignatures : this.assets.equipmentLayers;
+      const manifest = signature ? EQUIPMENT_LAYER_ASSETS.signatures : EQUIPMENT_LAYER_ASSETS.layers;
+      if (!Number.isInteger(layer.cell) || layer.cell < 0 || !this._assetReady(image)) continue;
+      const anchor = layer.slot === 'head' ? anchors.head
+        : layer.slot === 'boots' ? anchors.feet
+          : layer.slot === 'weapon' ? anchors.hand
+            : layer.slot === 'offhand' ? anchors.offhand
+              : layer.slot === 'amulet' ? anchors.torso
+                : layer.slot === 'ring' ? anchors.hand
+                  : anchors.torso;
+      const offsetX = (anchor?.[0] ?? 0) * player.radius;
+      const offsetY = (anchor?.[1] ?? 0) * player.radius;
+      this.ctx.save();
+      this.ctx.globalAlpha = clamp(Number(layer.opacity) || 0, 0, 1);
+      this.ctx.globalCompositeOperation = layer.blend ?? 'source-over';
+      this._drawAtlas(image, manifest.columns, manifest.rows, layer.cell, offsetX, offsetY, player.radius * 4.2, player.radius * 4.2);
+      this.ctx.restore();
+    }
   }
 
   _enemySprite(templateId, elite = false, boss = false) {
@@ -1110,40 +1144,14 @@ export class Renderer {
       ctx.beginPath(); ctx.arc(0, 0, player.radius + 9 + Math.sin(game.clock * 6) * 2, 0, Math.PI * 2); ctx.stroke();
     }
     const spriteSize = player.radius * 7.1;
-    const combo = player.presentation?.action?.profile?.comboIndex ?? player.attackChain ?? 1;
-    const motionStateName = player.deathTime > 0 ? 'death' : player.presentation?.reaction ? 'hit' : actionType === 'attack' ? `attack${Math.max(1, Math.min(3, combo))}` : player.dash ? 'dodge' : moving && actionType === 'idle' ? 'run' : actionType;
-    const motionState = HERO_MOTION_STATES[motionStateName] ?? HERO_MOTION_STATES.idle;
-    let motionProgress = 0;
-    if (player.deathTime > 0) motionProgress = clamp(1 - player.deathTime / 1.15, 0, .999);
-    else if (player.presentation?.reaction) motionProgress = clamp(1 - (player.presentation.reaction.time / Math.max(.01, player.presentation.reaction.duration)), 0, .999);
-    else if (animation.duration && animation.time > 0) motionProgress = clamp(1 - animation.time / animation.duration, 0, .999);
-    else if (moving) motionProgress = ((gait / (Math.PI * 2)) % 1 + 1) % 1;
-    else motionProgress = ((game.clock * 1.35) % 1 + 1) % 1;
-    const motionFrame = Math.min(7, Math.floor(motionProgress * 8));
-    const heroMotion = this._heroMotionImage(player.primary);
-    const motionRow = motionState * 8 + facingIndex;
-    const spriteDrawn = this._assetReady(heroMotion)
-      ? this._drawAtlas(heroMotion, 8, 80, motionRow * 8 + motionFrame, 0, -player.radius * .26, spriteSize, spriteSize)
-      : this._drawAtlas(this.assets.heroes, 4, 6, (PLAYER_ROWS[player.primary] ?? 0) * 4 + Math.min(3, Math.floor(facingIndex / 2)), 0, -player.radius * .26, spriteSize, spriteSize);
+    const resolvedClip = player.presentation?.resolvedClip;
+    const heroMotion = resolvedClip ? this.assets.heroMotion[player.primary] : null;
+    this._drawEquipmentLayers(player, game, 2, 2);
+    const spriteDrawn = resolvedClip && this._assetReady(heroMotion)
+      ? this._drawAtlas(heroMotion, 8, 80, resolvedClip.row * 8 + resolvedClip.frame, 0, -player.radius * .26, spriteSize, spriteSize)
+      : false;
     if (!spriteDrawn) { ctx.restore(); return; }
-    const equipped = Object.values(player.equipment ?? {}).filter(Boolean);
-    const equipmentPresentation = player.equipmentPresentation ?? {};
-    const { weaponKey = 'base', auraKey = 'base' } = equipmentPresentation;
-    const rarityOrder = { common: 0, magic: 1, rare: 2, relic: 3, unique: 4, mythic: 5 };
-    const visualItem = equipped.sort((a, b) => (rarityOrder[b.rarity] ?? 0) - (rarityOrder[a.rarity] ?? 0))[0];
-    if (visualItem && (rarityOrder[visualItem.rarity] ?? 0) >= 3) {
-      ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = visualItem.rarity === 'mythic' ? .34 : visualItem.rarity === 'unique' ? .24 : .14;
-      ctx.strokeStyle = RARITY_COLORS[visualItem.rarity] ?? hybrid.color; ctx.lineWidth = visualItem.rarity === 'mythic' ? 3 : 2;
-      ctx.beginPath(); ctx.arc(0, -player.radius * .08, player.radius * (1.2 + Math.sin(game.clock * 2.8) * .05), 0, Math.PI * 2); ctx.stroke(); ctx.restore();
-    }
-    if (auraKey !== 'base') {
-      const auraPulse = 1 + Math.sin(game.clock * 2.1) * .055;
-      ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = equipmentPresentation.rarity === 'mythic' ? .22 : .13;
-      ctx.strokeStyle = visualItem ? (RARITY_COLORS[visualItem.rarity] ?? hybrid.color) : hybrid.color; ctx.lineWidth = 1.5;
-      ctx.setLineDash(auraKey === 'drowned-sovereign-ward' ? [5, 6] : [9, 5]);
-      ctx.beginPath(); ctx.ellipse(0, player.radius * .36, player.radius * 1.35 * auraPulse, player.radius * .56 * auraPulse, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.restore();
-    }
+    this._drawEquipmentLayers(player, game, 3, 10);
     const covenantPresentation = player.covenantPresentation;
     if (covenantPresentation?.stage >= 2) {
       const palette = { flame: '#e97643', grave: '#a993c7', blood: '#c74d62', light: '#f0d789', storm: '#7fbbe5', void: '#8b74b6' };
@@ -1162,15 +1170,6 @@ export class Renderer {
     ctx.save();
     ctx.rotate(spriteFacing);
     this._drawPlayerGesture(player, primary, secondary, hybrid, actionType, actionProgress);
-    if (weaponKey !== 'base') {
-      ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = weaponKey === 'worldspine-rupture' ? .72 : .42;
-      ctx.strokeStyle = visualItem ? (RARITY_COLORS[visualItem.rarity] ?? hybrid.color) : hybrid.color;
-      ctx.lineWidth = weaponKey === 'worldspine-rupture' ? 3 : 2;
-      const reach = player.radius + 18 + actionProgress * 16;
-      ctx.beginPath(); ctx.moveTo(player.radius * .25, -2); ctx.lineTo(reach, -2); ctx.stroke();
-      if (weaponKey === 'worldspine-rupture') { ctx.beginPath(); ctx.arc(reach + 4, -2, 4 + Math.sin(game.clock * 4) * 1.2, 0, Math.PI * 2); ctx.stroke(); }
-      ctx.restore();
-    }
     if (player.covenantPresentation?.overlays?.weapon) {
       const palette = { flame: '#e97643', grave: '#a993c7', blood: '#c74d62', light: '#f0d789', storm: '#7fbbe5', void: '#8b74b6' };
       ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = .44; ctx.strokeStyle = palette[player.covenantPresentation.affinity] ?? hybrid.color; ctx.lineWidth = 2.2;

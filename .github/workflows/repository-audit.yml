@@ -1,0 +1,39 @@
+name: Repository Audit
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: repository-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  line-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      npm_config_engine_strict: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - name: Read and validate every tracked code/text file
+        run: node scripts/full-repo-audit.mjs
+      - name: Traverse and cross-check every exported data module
+        run: node scripts/data-integrity-audit.mjs
+      - name: Adversarial runtime and unintended behavior audit
+        run: node scripts/unintended-behavior-audit.mjs
+      - name: Hostile Hunter persistence audit
+        run: node scripts/hunter-hardening-audit.mjs
+      - name: Save-controlled UI string rendering audit
+        run: node scripts/ui-save-string-hardening.mjs
+      - name: Legacy progression conversion audit
+        run: node scripts/progression-hardening-audit.mjs

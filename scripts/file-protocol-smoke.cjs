@@ -10,6 +10,7 @@ app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
 
 app.whenReady().then(async () => {
+  const { ACTION_VFX_FRAME_COUNT, ACTION_VFX_SHEETS } = await import('../src/data/action-vfx.js');
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -32,18 +33,15 @@ app.whenReady().then(async () => {
   const assetDiagnosis = await window.webContents.executeJavaScript(`(() => {
     const { renderer } = window.ashenCovenant;
     const status = renderer.getAssetStatus();
+    const describe = (image) => ({ source: image?.src ?? '', width: image?.naturalWidth ?? 0, height: image?.naturalHeight ?? 0 });
     return {
       status,
       protocol: location.protocol,
-      heroSource: renderer.assets.heroes.src,
-      heroWidth: renderer.assets.heroes.naturalWidth,
-      heroHeight: renderer.assets.heroes.naturalHeight,
-      enemyMotion: Object.fromEntries(Object.entries(renderer.assets.enemyMotion).map(([id, image]) => [id, {
-        source: image.src, width: image.naturalWidth, height: image.naturalHeight
-      }])),
-      actionVfx: Object.fromEntries(Object.entries(renderer.assets.actionVfx).map(([id, image]) => [id, {
-        source: image.src, width: image.naturalWidth, height: image.naturalHeight
-      }])),
+      heroMotion: Object.fromEntries(Object.entries(renderer.assets.heroMotion).map(([id, image]) => [id, describe(image)])),
+      enemyMotion: Object.fromEntries(Object.entries(renderer.assets.enemyMotion).map(([id, image]) => [id, describe(image)])),
+      actionVfx: Object.fromEntries(Object.entries(renderer.assets.actionVfx).map(([id, image]) => [id, describe(image)])),
+      equipmentLayers: describe(renderer.assets.equipmentLayers),
+      equipmentSignatures: describe(renderer.assets.equipmentSignatures),
       terrainSource: renderer.assets.terrain.src,
       entranceSource: renderer.assets.entrances.src,
       propSource: renderer.assets.props.src,
@@ -53,16 +51,30 @@ app.whenReady().then(async () => {
   assert.equal(assetDiagnosis.protocol, 'file:', 'release smoke must exercise Electron file:// loading');
   assert.equal(assetDiagnosis.status.ready, true, `required art did not load: ${JSON.stringify(assetDiagnosis.status)}`);
   assert.equal(assetDiagnosis.status.failed.length, 0, 'no required runtime art may fail');
-  assert.ok(assetDiagnosis.heroSource.includes('/dist/assets/hero-facing-atlas-v5.png'), 'fixed-facing hero art must resolve inside packaged dist/assets');
-  assert.ok(assetDiagnosis.heroWidth >= 1_000 && assetDiagnosis.heroHeight >= 1_000, 'the hero-facing atlas must decode at full size');
+  assert.equal(Object.keys(assetDiagnosis.heroMotion).length, 6, 'all six v7 class motion atlases must load');
+  for (const [id, motion] of Object.entries(assetDiagnosis.heroMotion)) {
+    assert.ok(motion.source.includes(`/dist/assets/hero-motion-${id}-v7.png`), `${id} hero motion must resolve inside packaged dist/assets`);
+    assert.ok(motion.width > 0 && motion.height > 0, `${id} hero motion atlas must decode`);
+  }
   for (const [id, motion] of Object.entries(assetDiagnosis.enemyMotion)) {
-    assert.ok(motion.source.includes(`/dist/assets/enemy-motion-${id}-v5.png`), `${id} enemy-motion art must resolve inside packaged dist/assets`);
-    assert.ok(motion.width >= 1_000 && motion.height >= 1_000, `${id} enemy-motion atlas must decode at full size`);
+    assert.ok(motion.source.includes(`/dist/assets/enemy-motion-${id}-v7.png`), `${id} enemy-motion art must resolve inside packaged dist/assets`);
+    assert.ok(motion.width > 0 && motion.height > 0, `${id} enemy-motion atlas must decode`);
   }
-  for (const [id, sheet] of Object.entries(assetDiagnosis.actionVfx)) {
-    assert.ok(sheet.source.includes(`/dist/assets/attack-vfx-${id}-v6.png`), `${id} action animation art must resolve inside packaged dist/assets`);
-    assert.ok(sheet.width >= 1_600 && sheet.height >= 700, `${id} action animation sheet must decode at release scale`);
+  assert.deepEqual(Object.keys(assetDiagnosis.actionVfx).sort(), Object.keys(ACTION_VFX_SHEETS).sort(), 'runtime action VFX sheets must match the data manifest');
+  for (const [id, manifest] of Object.entries(ACTION_VFX_SHEETS)) {
+    const sheet = assetDiagnosis.actionVfx[id];
+    const packagedPath = `/dist${manifest.src}`;
+    assert.ok(sheet?.source.includes(packagedPath), `${id} action animation art must resolve from its manifest path inside packaged dist/assets`);
+    assert.ok(sheet.width > 0 && sheet.height > 0, `${id} action animation sheet must decode`);
+    assert.equal(sheet.width % ACTION_VFX_FRAME_COUNT, 0, `${id} action animation width must fit ${ACTION_VFX_FRAME_COUNT} authored frames`);
+    assert.equal(sheet.height % manifest.rows, 0, `${id} action animation height must fit ${manifest.rows} authored rows`);
+    assert.ok(sheet.width / ACTION_VFX_FRAME_COUNT >= 128, `${id} action animation frame cells must remain readable`);
+    assert.ok(sheet.height / manifest.rows >= 12, `${id} action animation row cells must remain readable`);
   }
+  assert.ok(assetDiagnosis.equipmentLayers.source.includes('/dist/assets/equipment/v7/equipment-layers-v7.svg'), 'equipment layers must resolve inside packaged dist/assets');
+  assert.ok(assetDiagnosis.equipmentLayers.width > 0 && assetDiagnosis.equipmentLayers.height > 0, 'equipment layers must decode');
+  assert.ok(assetDiagnosis.equipmentSignatures.source.includes('/dist/assets/equipment/v7/equipment-signatures-v7.svg'), 'equipment signatures must resolve inside packaged dist/assets');
+  assert.ok(assetDiagnosis.equipmentSignatures.width > 0 && assetDiagnosis.equipmentSignatures.height > 0, 'equipment signatures must decode');
   assert.ok(assetDiagnosis.terrainSource.includes('/dist/assets/terrain/terrain-atlas-v5.png'), 'painted terrain must resolve inside packaged dist/assets');
   assert.ok(assetDiagnosis.entranceSource.includes('/dist/assets/entrance-atlas-v5.png'), 'entrance art must resolve inside packaged dist/assets');
   assert.ok(assetDiagnosis.propSource.includes('/dist/assets/environment-props-v5.png'), 'world prop art must resolve inside packaged dist/assets');

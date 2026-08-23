@@ -1,0 +1,31 @@
+name: V7 Combat Soundscape
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: v7-audio-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      npm_config_engine_strict: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - name: Certify v7 combat soundscape
+        run: npm run test:v7:audio
+      - name: Required v7 audio load validation
+        run: node scripts/v7-audio-load-validation.mjs

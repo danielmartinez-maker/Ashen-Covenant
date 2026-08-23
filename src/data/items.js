@@ -171,6 +171,10 @@ export const UNIQUES = [
   { id: 'worldspine', name: 'Worldspine', rarity: 'mythic', slot: 'weapon', icon: '✦', art: 15, sources: ['gauntlet', 'mythic-hunt'], effect: 'A splinter from every broken region binds both oaths into one apex weapon.', statBonuses: { power: 22, ultimateDamage: 0.2, hybridDamage: 0.22, bossDamage: 0.13 } }
 ];
 
+export const UNIQUE_VISUAL_SIGNATURE_IDS = Object.freeze(Object.fromEntries(
+  UNIQUES.map((unique) => [unique.id, `unique:${unique.id}`])
+));
+
 export const uniqueById = (id) => UNIQUES.find((unique) => unique.id === id) ?? null;
 
 export const SET_COLLECTIONS = [
