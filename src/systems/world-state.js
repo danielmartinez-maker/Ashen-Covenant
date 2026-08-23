@@ -266,6 +266,7 @@ export class WorldStateManager {
     region.failedCount = integer(finite(region.failedCount, 0) + 1, 0, 0, 1_000_000);
     region.pressure = Math.min(5, finite(region.pressure, 0) + 1);
     region.lastOutcome = record.outcome;
+    region.lastEventId = event.id;
     if (state.procession?.eventId === event.id) state.procession = null;
     return record;
   }
