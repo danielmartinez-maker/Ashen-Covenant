@@ -31,6 +31,8 @@ jobs:
         run: node scripts/v7-audio-resolver.mjs
       - name: V7 audio director
         run: node scripts/v7-audio-director.mjs
+      - name: V7 audio orchestration
+        run: node scripts/v7-audio-integration.mjs
       - name: Adaptive music regression
         run: node scripts/adaptive-music.mjs
       - name: Legacy presentation audio regression
