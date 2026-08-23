@@ -39,7 +39,6 @@ const migrateHunters = (player) => {
 export class SaveMigrator {
   static migrate(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return snapshot;
-    if (Number(snapshot.version) >= SAVE_SCHEMA_V19 && snapshot.player?.covenant && snapshot.player?.worldV2 && snapshot.player?.sanctuary && Array.isArray(snapshot.player?.hunters)) return clone(snapshot);
     const next = clone(snapshot);
     next.version = SAVE_SCHEMA_V19;
     next.player = record(next.player);
@@ -52,7 +51,7 @@ export class SaveMigrator {
       activeEvents: Array.isArray(player.worldV2?.activeEvents) ? clone(player.worldV2.activeEvents) : [],
       resolvedEvents: Array.isArray(player.worldV2?.resolvedEvents) ? clone(player.worldV2.resolvedEvents) : [],
       procession: player.worldV2?.procession ? clone(player.worldV2.procession) : null,
-      tick: Number(player.worldV2?.tick) || 0
+      tick: bounded(player.worldV2?.tick, 0, Number.MAX_SAFE_INTEGER, 0)
     };
     player.sanctuary = {
       level: Math.max(1, Math.min(5, Math.floor(Number(player.sanctuary?.level) || 1))),
@@ -63,7 +62,7 @@ export class SaveMigrator {
       discoveries: Array.isArray(player.sanctuary?.discoveries) ? clone(player.sanctuary.discoveries) : []
     };
     player.mutationProgress = {
-      credits: Math.max(0, Math.floor(Number(player.mutationProgress?.credits) || 0)),
+      credits: Math.floor(bounded(player.mutationProgress?.credits, 0, 1_000_000, 0)),
       selections: { ...record(player.mutationProgress?.selections) },
       unlocked: Array.isArray(player.mutationProgress?.unlocked) ? [...new Set(player.mutationProgress.unlocked)] : [],
       legacyConverted: player.mutationProgress?.legacyConverted === true
