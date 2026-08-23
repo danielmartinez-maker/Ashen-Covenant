@@ -103,12 +103,21 @@ export class WorldStateManager {
     const activeEvents = safeArray(input.activeEvents).map((entry) => this.#normalizeEvent(entry)).filter(Boolean).slice(0, 16);
     const resolvedEvents = safeArray(input.resolvedEvents).map((entry) => this.#normalizeResolvedEvent(entry)).filter(Boolean).slice(-40);
     const processionRaw = safeRecord(input.procession);
-    const procession = input.procession && Object.keys(processionRaw).length ? {
-      eventId: safeText(processionRaw.eventId, '', 120),
-      zoneId: PROCESSION_ROUTE.includes(processionRaw.zoneId) ? processionRaw.zoneId : PROCESSION_ROUTE[0],
-      routeIndex: integer(processionRaw.routeIndex, 0, 0, PROCESSION_ROUTE.length - 1),
-      travel: bounded(processionRaw.travel, 0, 0, 30)
-    } : null;
+    let procession = null;
+    if (input.procession && Object.keys(processionRaw).length) {
+      const eventId = safeText(processionRaw.eventId, '', 120);
+      const linkedEvent = activeEvents.find((event) => event.id === eventId && event.typeId === 'black-procession');
+      const storedZone = PROCESSION_ROUTE.includes(processionRaw.zoneId) ? processionRaw.zoneId : PROCESSION_ROUTE[0];
+      const zoneId = linkedEvent && PROCESSION_ROUTE.includes(linkedEvent.zoneId) ? linkedEvent.zoneId : storedZone;
+      const routeIndex = Math.max(0, PROCESSION_ROUTE.indexOf(zoneId));
+      if (linkedEvent) linkedEvent.zoneId = zoneId;
+      procession = {
+        eventId,
+        zoneId,
+        routeIndex,
+        travel: bounded(processionRaw.travel, 0, 0, 30)
+      };
+    }
     return { regions, activeEvents, resolvedEvents, procession, tick: Math.max(0, finite(input.tick, 0)) };
   }
 
