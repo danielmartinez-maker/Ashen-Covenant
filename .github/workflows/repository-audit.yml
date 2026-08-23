@@ -13,6 +13,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  apply-contact-hardening:
+    if: github.ref == 'refs/heads/v7-embodied-covenant' || github.event.pull_request.head.ref == 'v7-embodied-covenant'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v7-embodied-covenant
+          fetch-depth: 0
+      - name: Apply exact melee contact patch once
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/systems/game.js')
+          source = path.read_text(encoding='utf-8')
+          old = """    this.presentation?.emit('combat:enemy-impact', {
+            entityId: enemy.id, enemyId: enemy.templateId, role, attackId: enemy.attack,
+            x: enemy.telegraph?.targetX ?? enemy.x, y: enemy.telegraph?.targetY ?? enemy.y, phase: enemy.phase ?? 1
+          }, { source: 'enemy-combat', priority: enemy.boss ? 9 : enemy.elite ? 6 : 3 });
+          this.emit('sound', { id: enemy.boss ? 'boss-attack' : role === 'brute' ? 'enemy-heavy' : 'enemy-attack', priority: enemy.boss ? 9 : 3 });
+          if (role === 'melee' || role === 'shield' || role === 'brute') {
+            const hit = this._playerInsideEnemyTelegraph(enemy) && this._damagePlayer(enemy.damage * accuracy, enemy.attack);
+"""
+          new = """    const contactRole = role === 'melee' || role === 'shield' || role === 'brute';
+          const emitEnemyImpact = () => this.presentation?.emit('combat:enemy-impact', {
+            entityId: enemy.id, enemyId: enemy.templateId, role, attackId: enemy.attack,
+            x: enemy.telegraph?.targetX ?? enemy.x, y: enemy.telegraph?.targetY ?? enemy.y, phase: enemy.phase ?? 1
+          }, { source: 'enemy-combat', priority: enemy.boss ? 9 : enemy.elite ? 6 : 3 });
+          if (!contactRole) emitEnemyImpact();
+          this.emit('sound', { id: enemy.boss ? 'boss-attack' : role === 'brute' ? 'enemy-heavy' : 'enemy-attack', priority: enemy.boss ? 9 : 3 });
+          if (contactRole) {
+            const hit = this._playerInsideEnemyTelegraph(enemy) && this._damagePlayer(enemy.damage * accuracy, enemy.attack);
+            if (hit) emitEnemyImpact();
+"""
+          if old in source:
+              if source.count(old) != 1:
+                  raise SystemExit('contact patch source block is not unique')
+              path.write_text(source.replace(old, new), encoding='utf-8')
+          elif "const contactRole = role === 'melee' || role === 'shield' || role === 'brute';" not in source:
+              raise SystemExit('neither original nor hardened contact block was found')
+          PY
+      - name: Commit patch when needed
+        shell: bash
+        run: |
+          if git diff --quiet -- src/systems/game.js; then
+            echo "Contact hardening already applied."
+            exit 0
+          fi
+          git diff --check
+          git config user.name "Ashen Covenant Hardening"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/systems/game.js
+          git commit -m "fix: emit melee impact only on contact"
+          git push origin HEAD:v7-embodied-covenant
+
   line-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 30
