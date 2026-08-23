@@ -52,4 +52,25 @@ const boss = resolver.resolve('boss:signature-cue', { phase: 3 }, { ...context, 
 assert.equal(boss.semanticId, 'boss-phase');
 assert.ok(boss.layers.some((layer) => layer.assetId === 'boss-phase'));
 
+assert.equal(
+  semanticAudioEventFor('combat:enemy-impact', { role: 'ranged' }, { ...context, actorKind: 'enemy', enemyRole: 'ranged' }),
+  'projectile-launch',
+  'ranged attack release must not masquerade as physical contact'
+);
+assert.equal(
+  semanticAudioEventFor('combat:enemy-impact', { role: 'summoner' }, { ...context, actorKind: 'enemy', enemyRole: 'summoner' }),
+  'summon',
+  'summoner release must use the summon semantic'
+);
+assert.equal(
+  semanticAudioEventFor('combat:enemy-impact', { role: 'commander' }, { ...context, actorKind: 'enemy', enemyRole: 'commander' }),
+  'enemy-command',
+  'commander support release must use command audio'
+);
+assert.equal(
+  semanticAudioEventFor('combat:enemy-impact', { role: 'healer' }, { ...context, actorKind: 'enemy', enemyRole: 'healer' }),
+  'spell-cast',
+  'healer support release must use cast audio'
+);
+
 console.log('Ashen Covenant v7 semantic audio resolver regression passed.');
