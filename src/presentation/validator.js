@@ -3,6 +3,7 @@ import {
   PRESENTATION_FALLBACKS, SOUND_PROFILES, DESTRUCTIBLE_PROFILES, PLAYER_ACTION_PROFILES
 } from '../data/presentation.js';
 import { ANIMATION_SEMANTIC_STATES, HERO_MOTION_ASSETS, PLAYER_ANIMATION_CLIPS } from '../data/animation-v7.js';
+import { MAX_SFX_VOICES } from '../systems/audio.js';
 
 const issue = (severity, code, message, target = null) => ({ severity, code, message, target });
 
@@ -126,6 +127,6 @@ export const validatePresentationRuntime = (game, presentation) => {
   if (game?.hitStop < 0 || !Number.isFinite(game?.hitStop ?? 0)) issues.push(issue('error', 'RUNTIME_INVALID_HITSTOP', 'Hit stop became invalid.'));
   if (game?.camera && (![game.camera.x, game.camera.y, game.camera.zoom].every(Number.isFinite) || game.camera.zoom <= 0)) issues.push(issue('error', 'RUNTIME_INVALID_CAMERA', 'Camera state became invalid.'));
   if ((presentation?.eventBus?.stats?.listenerErrors ?? 0) > 0) issues.push(issue('error', 'RUNTIME_EVENT_ERROR', 'A presentation listener raised an error.'));
-  if (presentation?.audio?.debug?.().activeVoices > 32) issues.push(issue('warning', 'RUNTIME_SFX_BUDGET', 'SFX voice budget was exceeded.'));
+  if (presentation?.audio?.debug?.().activeVoices > MAX_SFX_VOICES) issues.push(issue('warning', 'RUNTIME_SFX_BUDGET', 'SFX voice budget was exceeded.'));
   return { valid: !issues.some((entry) => entry.severity === 'error'), issues };
 };
