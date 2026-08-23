@@ -4,6 +4,7 @@ import { ITEM_BASES } from '../src/data/items.js';
 import { BLACK_ROAD_BY_ID } from '../src/data/requiem.js';
 import { SAVE_KEY, SETTINGS_KEY, WORLD_SIZE, MAX_LEVEL } from '../src/core/constants.js';
 import { loadSave, loadSettings } from '../src/systems/save.js';
+import { DomainEventBus } from '../src/systems/domain-events.js';
 import { GameEngine } from '../src/systems/game.js';
 
 let store = new Map();
@@ -52,6 +53,15 @@ const assertRuntimeBounds = (game, label) => {
   assert.ok(game.entities.particles.length <= 760, `${label}: particle cap`);
   assert.ok(game.entities.corpses.length <= 48, `${label}: corpse cap`);
 };
+
+// Gameplay domain events are notifications. A broken observer must not abort the
+// gameplay mutation that emitted the event or starve later observers.
+const domainBus = new DomainEventBus();
+let domainDelivered = 0;
+domainBus.on('combat:hit-resolved', () => { throw new Error('observer failed'); });
+domainBus.on('combat:hit-resolved', () => { domainDelivered += 1; });
+assert.doesNotThrow(() => domainBus.emit('combat:hit-resolved', { enemyId: 'audit-enemy' }), 'domain observer failure must not escape into gameplay');
+assert.equal(domainDelivered, 1, 'later gameplay observers must still receive an event after one observer fails');
 
 // Storage parser boundaries.
 store.set(SAVE_KEY, '{not json');
