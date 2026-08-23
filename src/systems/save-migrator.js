@@ -1,3 +1,5 @@
+import { BLACK_ROAD_BY_ID } from '../data/requiem.js';
+
 export const SAVE_SCHEMA_V19 = 19;
 const ALIGNMENTS = ['flame', 'grave', 'blood', 'light', 'storm', 'void'];
 const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -36,6 +38,27 @@ const migrateHunters = (player) => {
   }));
 };
 
+const normalizeActiveOperation = (operation) => {
+  if (!operation || typeof operation !== 'object' || Array.isArray(operation)) return operation;
+  const next = clone(operation);
+  if (next.blackRoad !== true) return next;
+  const expedition = BLACK_ROAD_BY_ID[next.expeditionId];
+  if (!expedition) return next;
+
+  const claimedStageIds = new Set(
+    Array.isArray(next.completedStageIds)
+      ? next.completedStageIds.filter((id) => typeof id === 'string')
+      : []
+  );
+  const completedStageIds = [];
+  for (const stage of expedition.stages) {
+    if (!claimedStageIds.has(stage.id)) break;
+    completedStageIds.push(stage.id);
+  }
+  next.completedStageIds = completedStageIds;
+  return next;
+};
+
 export class SaveMigrator {
   static migrate(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return snapshot;
@@ -67,6 +90,7 @@ export class SaveMigrator {
       unlocked: Array.isArray(player.mutationProgress?.unlocked) ? [...new Set(player.mutationProgress.unlocked)] : [],
       legacyConverted: player.mutationProgress?.legacyConverted === true
     };
+    if ('activeOperation' in next) next.activeOperation = normalizeActiveOperation(next.activeOperation);
     return next;
   }
 }
