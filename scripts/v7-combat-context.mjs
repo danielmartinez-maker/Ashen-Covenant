@@ -79,6 +79,35 @@ assert.equal(corruptedAmulet.corruption, 1, 'production text-form corruption mus
 assert.equal(textCorruptionContext.corruptionLevel, 1, 'aggregate combat presentation must retain production corruption state');
 assert.ok(textCorruptionContext.visualSignatureIds.includes('unique:bloodroot-idol'), 'accessory Unique signatures must remain visible to presentation context');
 
+// Non-player actor context must never inherit the player's class/loadout/Covenant identity.
+const enemyActor = {
+  id: 'enemy-actor', role: 'brute', x: 240, y: 210, facing: Math.PI,
+  elevation: 0, grounded: true, state: 'windup', animation: { type: 'attack', duration: 0.8, time: 0.4 },
+  presentation: { visualFacing: Math.PI }
+};
+const enemyContext = resolver.resolve(game, { damageType: 'physical' }, { actor: enemyActor, eventType: 'combat:enemy-telegraph', target: player });
+assert.equal(enemyContext.actorKind, 'enemy');
+assert.equal(enemyContext.enemyRole, 'brute');
+assert.equal(enemyContext.primaryClass, null, 'enemy actor must not inherit player primary class');
+assert.equal(enemyContext.secondaryClass, null, 'enemy actor must not inherit player secondary class');
+assert.equal(enemyContext.hybridId, null, 'enemy actor must not inherit player hybrid');
+assert.equal(enemyContext.weaponFamily, null, 'enemy actor must not inherit player weapon family');
+assert.equal(enemyContext.offhandFamily, null, 'enemy actor must not inherit player offhand');
+assert.deepEqual(enemyContext.visibleEquipment, [], 'enemy actor must not inherit player equipment');
+assert.deepEqual(enemyContext.visualSignatureIds, [], 'enemy actor must not inherit player Unique signatures');
+assert.equal(enemyContext.masterworkRank, 0, 'enemy actor must not inherit player Masterwork');
+assert.equal(enemyContext.corruptionLevel, 0, 'enemy actor must not inherit player corruption');
+assert.equal(enemyContext.covenantPrimary, 'unbound', 'enemy actor must not inherit player Covenant affinity');
+assert.equal(enemyContext.covenantSecondary, null);
+assert.equal(enemyContext.covenantStage, 0);
+assert.equal(enemyContext.covenantInstability, 0);
+
+const hunterActor = { ...enemyActor, id: 'hunter-actor', hunterId: 'ash-pursuer' };
+const hunterContext = resolver.resolve(game, {}, { actor: hunterActor, eventType: 'hunter:intrusion' });
+assert.equal(hunterContext.actorKind, 'hunter');
+assert.equal(hunterContext.hunterId, 'ash-pursuer');
+assert.equal(hunterContext.primaryClass, null);
+
 const neutral = neutralPresentationCombatContext();
 assert.equal(Object.isFrozen(neutral), true);
 assert.equal(neutral.actorKind, 'unknown');
