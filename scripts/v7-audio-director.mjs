@@ -70,6 +70,9 @@ const event = Object.freeze({
 
 assert.equal(audio.playResolved(event), true);
 assert.equal(audio.debug().categoryVoices.impact, 2);
+assert.equal(audio.playResolved({ ...event, id: 'same-frame-impact' }), false, 'authored semantic cooldown must reject an identical concurrency group in the same audio instant');
+audio.context.currentTime = 0.021;
+assert.equal(audio.playResolved({ ...event, id: 'post-cooldown-impact' }), true, 'semantic event must become admissible after its authored cooldown');
 for (let index = 0; index < 20; index += 1) audio.playResolved({ ...event, id: `impact-${index}` });
 assert.ok(audio.debug().categoryVoices.impact <= 10, 'impact category must stay within its voice cap');
 assert.ok(audio.debug().activeVoices <= 36, 'global SFX voices must stay within the v7 budget');
