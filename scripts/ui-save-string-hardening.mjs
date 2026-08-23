@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
+import { FocusNavigator } from '../src/ui/focus.js';
 
 const dom = new JSDOM('<!doctype html><html><body><main id="root"></main></body></html>', {
   url: 'http://localhost/',
@@ -13,6 +14,16 @@ Object.assign(globalThis, {
   Node: dom.window.Node,
   localStorage: dom.window.localStorage
 });
+
+// Automatic focus selection must skip hidden/aria-hidden active controls.
+const focusScope = document.createElement('section');
+focusScope.innerHTML = '<div class="is-hidden"><button id="hidden-active" class="is-active">Hidden</button></div><button id="visible-focus">Visible</button>';
+document.body.append(focusScope);
+const focusNavigator = new FocusNavigator(document.body);
+const initialFocus = focusNavigator.activate(focusScope);
+assert.equal(initialFocus?.id, 'visible-focus', 'hidden active controls must not capture modal focus');
+focusNavigator.deactivate({ restore: false });
+focusScope.remove();
 
 const [{ GameEngine }, { GameUI }] = await Promise.all([
   import('../src/systems/game.js'),
