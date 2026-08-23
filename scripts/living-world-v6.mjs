@@ -97,6 +97,36 @@ assert.equal(
 );
 assert.equal(lifecycleCollision.procession, null, 'a terminal Black Procession event must not retain a live Procession route');
 
+// The bounded terminal-history window must not make event identities reusable.
+// With 40 terminal records at one tick, resolving and immediately restarting an
+// event must allocate a new ID rather than colliding with the record just written.
+const saturatedHistory = world.normalize({
+  tick: 500,
+  resolvedEvents: Array.from({ length: 40 }, (_, index) => ({
+    id: `world-history-${index + 1}`,
+    typeId: 'gravewake-rising',
+    zoneId: 'gravewake',
+    startedAt: index,
+    elapsed: 1,
+    duration: 240,
+    progress: 1,
+    target: 1,
+    resolved: true,
+    failed: false,
+    outcome: 'cleared',
+    resolvedAt: index + 1
+  }))
+});
+const firstCappedEvent = world.startEvent(saturatedHistory, 'gravewake-rising', { zoneId: 'gravewake' });
+world.resolveEvent(saturatedHistory, firstCappedEvent.id, { outcome: 'cleared' });
+const secondCappedEvent = world.startEvent(saturatedHistory, 'gravewake-rising', { zoneId: 'gravewake' });
+assert.notEqual(secondCappedEvent.id, firstCappedEvent.id, 'terminal-history trimming must never make a persistent event ID reusable');
+const normalizedCappedHistory = world.normalize(saturatedHistory);
+assert(
+  normalizedCappedHistory.activeEvents.some((event) => event.id === secondCappedEvent.id),
+  'a newly started event must survive normalization even after terminal history reaches its cap'
+);
+
 const { GameEngine } = await import('../src/systems/game.js');
 const input = { pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; }, isHeld() { return false; }, consume() { return false; }, defer() {}, rumble() {} };
 const make = () => new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 } }, { reducedVfx: true });
