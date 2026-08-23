@@ -67,7 +67,9 @@ export class BossController {
     const resolved = state ?? this.states.get(enemy.id) ?? this.update(enemy, {});
     const phaseDef = definition.phases[Math.max(0, Math.min(2, (resolved.phase ?? 1) - 1))];
     const mechanics = phaseDef.mechanics;
-    const index = Math.max(0, Number(enemy.attackCount) || 0) % mechanics.length;
+    const attackCount = Number(enemy.attackCount);
+    const launchedIndex = Number.isFinite(attackCount) && attackCount > 0 ? Math.floor(attackCount) - 1 : 0;
+    const index = launchedIndex % mechanics.length;
     const id = mechanics[index];
     return {
       id,
