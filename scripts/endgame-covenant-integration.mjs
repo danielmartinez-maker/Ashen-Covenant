@@ -62,6 +62,27 @@ assert.deepEqual(
 );
 assert.equal(checkpointProbe.endgame.activeStage?.id, 'funeral-gate', 'corrupt later-stage claims must resume at the first authored room');
 
+// Authored route drafting removes already-owned boons from its pool, so every
+// boon is single-instance. A hostile save must not reintroduce duplicate boon
+// IDs (which would stack their modifiers repeatedly) or retain unknown route IDs.
+const routeIntegrityProbe = make();
+routeIntegrityProbe.random = () => 0.1;
+assert(routeIntegrityProbe.start('warden', 'thornseer'));
+const duplicatedRouteSnapshot = structuredClone(game.snapshot());
+duplicatedRouteSnapshot.activeOperation.expeditionBoons = ['breaker-route', 'breaker-route', 'not-an-authored-boon'];
+duplicatedRouteSnapshot.activeOperation.expeditionBanes = ['fragile', 'fragile', 'not-an-authored-bane'];
+routeIntegrityProbe._restoreSnapshot(duplicatedRouteSnapshot);
+assert.deepEqual(
+  routeIntegrityProbe.endgame.expeditionBoons,
+  ['breaker-route'],
+  'Black Road restore must keep each authored expedition boon at most once and discard unknown boon IDs'
+);
+assert.deepEqual(
+  routeIntegrityProbe.endgame.expeditionBanes,
+  ['fragile'],
+  'Black Road restore must keep each authored expedition bane at most once and discard unknown bane IDs'
+);
+
 const frozenContext = JSON.parse(JSON.stringify(game.endgame.routeContext));
 game.save();
 const restored = make();
