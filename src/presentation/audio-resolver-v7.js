@@ -75,6 +75,7 @@ const covenantAccentAllowed = (semanticId, context) => {
 
 export const semanticAudioEventFor = (eventType, detail = {}, context = {}) => {
   if (eventType === 'context:changed') return 'regional-ambience';
+  if (eventType === 'hunter:intrusion') return 'hunter-intrusion';
   if (eventType === 'animation:footstep') return 'footstep';
   if (eventType === 'combat:attack-start') return context.execution ? 'execution-start' : 'weapon-swing';
   if (eventType === 'combat:attack-impact') return context.execution ? 'execution-contact' : context.damageFamily === 'magic' ? 'spell-impact' : 'physical-impact';
