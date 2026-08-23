@@ -26,6 +26,7 @@ const FOOTSTEP_SAMPLE = {
 };
 
 const BUS_NAMES = ['music', 'exploration', 'combat', 'boss', 'stingers', 'cinematic', 'ui', 'dialogue', 'abilities', 'enemyAbilities', 'ambience', 'footsteps', 'impacts', 'destruction'];
+export const MAX_SFX_VOICES = 36;
 
 export class AudioDirector {
   constructor(settings = {}) {
@@ -40,7 +41,7 @@ export class AudioDirector {
     this.game = null;
     this.lastSound = new Map();
     this.activeVoices = [];
-    this.maxSfxVoices = 32;
+    this.maxSfxVoices = MAX_SFX_VOICES;
     this.noiseBuffer = null;
     this.samples = new Map();
     this.sampleLoads = new Map();
