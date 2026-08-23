@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/systems/game.js';
+import { AudioDirector } from '../src/systems/audio.js';
 import { GamePresentationSystem } from '../src/presentation/system.js';
 import { CLASS_PRESENTATION_PROFILES, DESTRUCTIBLE_PROFILES } from '../src/data/presentation.js';
 import { validatePresentationData, validatePresentationRuntime } from '../src/presentation/validator.js';
@@ -25,6 +26,21 @@ assert.equal(validation.summary.classes, 6);
 assert.equal(validation.summary.attacks, 18);
 assert.equal(validation.summary.actions, 10);
 assert.ok(validation.summary.cues >= 35);
+
+// V7's global SFX budget is 36 voices. Runtime admission and validation must agree.
+const audioBudgetProbe = new AudioDirector({ sound: false });
+assert.equal(audioBudgetProbe.maxSfxVoices, 36, 'AudioDirector must use the approved v7 global SFX budget');
+const runtimeBudgetGame = { player: { animation: {} }, hitStop: 0, camera: { x: 0, y: 0, zoom: 1 }, getBoss: () => null };
+const runtimeAtBudget = validatePresentationRuntime(runtimeBudgetGame, {
+  eventBus: { stats: { listenerErrors: 0 } },
+  audio: { debug: () => ({ activeVoices: 36 }) }
+});
+assert.equal(runtimeAtBudget.issues.some((entry) => entry.code === 'RUNTIME_SFX_BUDGET'), false, 'validator must allow the full v7 36-voice budget');
+const runtimeOverBudget = validatePresentationRuntime(runtimeBudgetGame, {
+  eventBus: { stats: { listenerErrors: 0 } },
+  audio: { debug: () => ({ activeVoices: 37 }) }
+});
+assert.equal(runtimeOverBudget.issues.some((entry) => entry.code === 'RUNTIME_SFX_BUDGET'), true, 'validator must warn above the v7 36-voice budget');
 
 // Weapon identities and their timing profiles must be mechanically distinct.
 assert.equal(new Set(Object.values(CLASS_PRESENTATION_PROFILES).map((profile) => profile.weapon)).size, 6);
