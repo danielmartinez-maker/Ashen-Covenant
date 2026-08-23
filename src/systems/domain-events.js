@@ -8,7 +8,11 @@ export const DOMAIN_EVENTS = new Set([
 ]);
 
 export class DomainEventBus {
-  constructor() { this.listeners = new Map(); }
+  constructor() {
+    this.listeners = new Map();
+    this.stats = { emitted: 0, listenerErrors: 0 };
+    this.lastListenerError = null;
+  }
   on(event, listener) {
     if (!DOMAIN_EVENTS.has(event) || typeof listener !== 'function') return () => {};
     if (!this.listeners.has(event)) this.listeners.set(event, new Set());
@@ -17,7 +21,15 @@ export class DomainEventBus {
   }
   emit(event, detail = {}) {
     if (!DOMAIN_EVENTS.has(event)) return false;
-    this.listeners.get(event)?.forEach((listener) => listener(detail));
+    this.stats.emitted += 1;
+    for (const listener of [...(this.listeners.get(event) ?? [])]) {
+      try {
+        listener(detail);
+      } catch (error) {
+        this.stats.listenerErrors += 1;
+        this.lastListenerError = { event, message: error?.message ?? String(error) };
+      }
+    }
     return true;
   }
   clear() { this.listeners.clear(); }
