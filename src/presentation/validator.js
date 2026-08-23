@@ -153,6 +153,18 @@ export const validatePresentationRuntime = (game, presentation) => {
   if (game?.camera && (![game.camera.x, game.camera.y, game.camera.zoom].every(Number.isFinite) || game.camera.zoom <= 0)) issues.push(issue('error', 'RUNTIME_INVALID_CAMERA', 'Camera state became invalid.'));
   if ((presentation?.eventBus?.stats?.listenerErrors ?? 0) > 0) issues.push(issue('error', 'RUNTIME_EVENT_ERROR', 'A presentation listener raised an error.'));
   const audioDebug = presentation?.audio?.debug?.();
+  const failedSamples = presentation?.audio?.sampleFailures;
+  const requiredAudioFailures = failedSamples && typeof failedSamples[Symbol.iterator] === 'function'
+    ? [...failedSamples].filter((id) => AUDIO_ASSETS_V7[id]?.required === true)
+    : [];
+  if (requiredAudioFailures.length) {
+    issues.push(issue(
+      'error',
+      'RUNTIME_V7_AUDIO_REQUIRED_LOAD',
+      `Required v7 audio failed to load/decode: ${requiredAudioFailures.join(', ')}.`,
+      requiredAudioFailures[0]
+    ));
+  }
   if ((audioDebug?.activeVoices ?? 0) > AUDIO_CATEGORY_BUDGETS.total) issues.push(issue('warning', 'RUNTIME_SFX_BUDGET', 'SFX voice budget was exceeded.'));
   for (const [category, cap] of Object.entries(AUDIO_CATEGORY_BUDGETS)) {
     if (category === 'total') continue;
