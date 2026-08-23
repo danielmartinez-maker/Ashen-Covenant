@@ -12,6 +12,7 @@ const IDENTITY_ORDER = Object.freeze(['boots', 'chest', 'head', 'gloves', 'offha
 const RARITY_ORDER = Object.freeze(['common', 'magic', 'rare', 'relic', 'unique', 'mythic']);
 
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const facingLaneFor = (value = 0) => ((Math.floor(finite(value, 0)) % 8) + 8) % 8;
 const corruptionLevelFor = (item = {}) => {
   if (Number.isFinite(Number(item.corruptionRank))) return Math.max(0, Number(item.corruptionRank));
   if (Number.isFinite(Number(item.corruption))) return Math.max(0, Number(item.corruption));
@@ -22,10 +23,20 @@ const stableItem = (item) => item ? [
   finite(item.masterworkRank ?? item.masterwork, 0), corruptionLevelFor(item)
 ].join(':') : '-';
 
-export const equipmentAppearanceRevisionKey = (equipment = {}, covenantIdentity = {}, reducedVfx = false) => [
+export const equipmentLayerOrderForFacing = (layer = {}, facingLane = 0) => {
+  const authored = finite(layer.order, 0);
+  if (layer.kind !== 'slot') return authored;
+  const lane = facingLaneFor(facingLane);
+  if (layer.slot === 'offhand' && [7, 0, 1].includes(lane)) return 2;
+  if (layer.slot === 'weapon' && [3, 4, 5].includes(lane)) return 2;
+  return authored;
+};
+
+export const equipmentAppearanceRevisionKey = (equipment = {}, covenantIdentity = {}, reducedVfx = false, facingLane = 0) => [
   ...IDENTITY_ORDER.map((slot) => `${slot}=${stableItem(equipment[slot])}`),
   `cov=${covenantIdentity.affinity ?? covenantIdentity.primary ?? 'unbound'}:${finite(covenantIdentity.stage, 0)}`,
-  `reduced=${Boolean(reducedVfx)}`
+  `reduced=${Boolean(reducedVfx)}`,
+  `facing=${facingLaneFor(facingLane)}`
 ].join('|');
 
 export class EquipmentAppearanceResolver {
@@ -36,8 +47,9 @@ export class EquipmentAppearanceResolver {
     this.misses = 0;
   }
 
-  resolve(equipment = {}, covenantIdentity = {}, { reducedVfx = false } = {}) {
-    const key = equipmentAppearanceRevisionKey(equipment, covenantIdentity, reducedVfx);
+  resolve(equipment = {}, covenantIdentity = {}, { reducedVfx = false, facingLane = 0 } = {}) {
+    const resolvedFacingLane = facingLaneFor(facingLane);
+    const key = equipmentAppearanceRevisionKey(equipment, covenantIdentity, reducedVfx, resolvedFacingLane);
     const cached = this.cache.get(key);
     if (cached) {
       this.hits += 1;
@@ -63,10 +75,12 @@ export class EquipmentAppearanceResolver {
       if (BODY_SLOTS.has(slot)) {
         const family = equipmentBaseFamily(item.baseId, slot);
         const cell = equipmentFamilyCell(item.baseId, slot);
-        layers.push(Object.freeze({
+        const layer = {
           kind: 'slot', slot, assetId: EQUIPMENT_LAYER_ASSETS.layers.id, cell, family,
           order: SLOT_ORDER[slot], opacity: 0.72, blend: 'source-over', requiredIdentity: false
-        }));
+        };
+        layer.order = equipmentLayerOrderForFacing(layer, resolvedFacingLane);
+        layers.push(Object.freeze(layer));
       }
 
       const signature = uniqueSignature(item.uniqueId);
@@ -99,6 +113,7 @@ export class EquipmentAppearanceResolver {
       corruptionTier: Math.min(3, Math.max(0, Math.floor(maxCorruption))),
       covenantAffinity: affinity,
       covenantStage,
+      facingLane: resolvedFacingLane,
       reducedVfx: Boolean(reducedVfx)
     });
 
