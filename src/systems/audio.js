@@ -1,9 +1,8 @@
 import { clamp } from '../core/math.js';
+import { AUDIO_ASSETS_V7, AUDIO_CATEGORY_BUDGETS, audioAsset } from '../data/audio-v7.js';
 import { SOUND_PROFILES, SURFACE_AUDIO } from '../data/presentation.js';
 import { AdaptiveMusicSystem } from '../presentation/music.js';
 import { resolveAssetUrl } from '../core/assets.js';
-
-
 
 const SAMPLE_ROOT = '/assets/audio/v5';
 const SAMPLE_BANK = {
@@ -26,7 +25,8 @@ const FOOTSTEP_SAMPLE = {
 };
 
 const BUS_NAMES = ['music', 'exploration', 'combat', 'boss', 'stingers', 'cinematic', 'ui', 'dialogue', 'abilities', 'enemyAbilities', 'ambience', 'footsteps', 'impacts', 'destruction'];
-export const MAX_SFX_VOICES = 36;
+const AUDIO_DEBUG_CATEGORIES = ['enemyVocal', 'footstep', 'impact', 'ambience', 'general'];
+export const MAX_SFX_VOICES = AUDIO_CATEGORY_BUDGETS.total;
 
 export class AudioDirector {
   constructor(settings = {}) {
@@ -144,9 +144,42 @@ export class AudioDirector {
     return promise;
   }
 
-  _sample(at, file, destination, priority, pitch, gainScale, pan = 0) {
-    const buffer = this.samples.get(file);
-    if (!buffer) { this._loadSample(file); return false; }
+  async preloadV7Required() {
+    const required = Object.values(AUDIO_ASSETS_V7).filter((asset) => asset.required);
+    const results = await Promise.all(required.map((asset) => this._loadV7Asset(asset.id)));
+    return results.every(Boolean);
+  }
+
+  async _loadV7Asset(assetId) {
+    const asset = audioAsset(assetId);
+    if (!asset || !this.context || this.samples.has(assetId) || this.sampleFailures.has(assetId)) return this.samples.get(assetId) ?? null;
+    if (this.sampleLoads.has(assetId)) return this.sampleLoads.get(assetId);
+    const promise = (async () => {
+      try {
+        const response = await fetch(resolveAssetUrl(asset.src));
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = await response.arrayBuffer();
+        const buffer = await this.context.decodeAudioData(bytes.slice(0));
+        this.samples.set(assetId, buffer);
+        return buffer;
+      } catch {
+        this.sampleFailures.add(assetId);
+        return null;
+      } finally {
+        this.sampleLoads.delete(assetId);
+      }
+    })();
+    this.sampleLoads.set(assetId, promise);
+    return promise;
+  }
+
+  _sample(at, key, destination, priority, pitch, gainScale, pan = 0, metadata = {}) {
+    const buffer = this.samples.get(key);
+    if (!buffer) {
+      if (audioAsset(key)) this._loadV7Asset(key);
+      else this._loadSample(key);
+      return false;
+    }
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     source.buffer = buffer;
@@ -155,7 +188,15 @@ export class AudioDirector {
     source.connect(gain);
     const spatial = this._connectSpatial(gain, destination, pan);
     const duration = Math.max(0.025, buffer.duration / Math.max(0.68, Number(pitch) || 1));
-    const voice = { source, end: at + duration + 0.015, priority, stopped: false, sampled: true };
+    const voice = {
+      source,
+      end: at + duration + 0.015,
+      priority,
+      stopped: false,
+      sampled: true,
+      category: metadata.category ?? 'general',
+      concurrencyGroup: metadata.concurrencyGroup ?? null
+    };
     this.activeVoices.push(voice);
     source.onended = () => { voice.stopped = true; try { source.disconnect(); gain.disconnect(); if (spatial !== destination) spatial.disconnect(); } catch { /* Nodes may already be collected. */ } };
     source.start(at);
@@ -212,6 +253,36 @@ export class AudioDirector {
     this.activeVoices = this.activeVoices.filter((voice) => voice.end > this.context.currentTime && !voice.stopped);
   }
 
+  playResolved(resolved = {}) {
+    if (!this.settings.sound || !this.context || this.context.state !== 'running' || !Array.isArray(resolved.layers) || !resolved.layers.length) return false;
+    const now = this.context.currentTime;
+    let played = false;
+    for (const layer of resolved.layers.slice(0, 4)) {
+      const assetId = layer?.assetId;
+      if (!audioAsset(assetId)) continue;
+      if (!this.samples.has(assetId)) {
+        this._loadV7Asset(assetId);
+        continue;
+      }
+      const priority = Number.isFinite(Number(layer.priority)) ? Number(layer.priority) : Number(resolved.priority) || 1;
+      const category = layer.category ?? 'general';
+      const concurrencyGroup = layer.concurrencyGroup ?? resolved.semanticId ?? null;
+      if (!this._reserveVoices(1, priority, { category, concurrencyGroup })) continue;
+      const destination = this.buses[layer.bus] ?? this.buses.abilities;
+      played = this._sample(
+        now,
+        assetId,
+        destination,
+        priority,
+        layer.pitch ?? 1,
+        clamp(Number(layer.gain ?? 1), 0, 1.5),
+        layer.pan ?? 0,
+        { category, concurrencyGroup }
+      ) || played;
+    }
+    return played;
+  }
+
   play(id, detail = {}) {
     if (!this.settings.sound || !this.context || this.context.state !== 'running') return false;
     const spec = SOUND_PROFILES[id] ?? SOUND_PROFILES.attack;
@@ -247,15 +318,35 @@ export class AudioDirector {
     return this.play('footstep', { surface: detail.surface ?? 'stone', pitch: surface.pitch * (detail.foot === 'right' ? 1.025 : 0.985) / Math.sqrt(armor), gain: (0.45 + speed * 0.4) * weight * armor, priority: 1, filter: surface.filter });
   }
 
-  _reserveVoices(count, priority) {
+  _stopVoice(voice) {
+    if (!voice) return;
+    voice.stopped = true;
+    try { voice.source.stop(); } catch { /* A scheduled source can already have ended. */ }
+    this.activeVoices = this.activeVoices.filter((entry) => entry !== voice);
+  }
+
+  _lowestPriorityVoice(entries) {
+    return entries.slice().sort((left, right) => left.priority - right.priority || left.end - right.end)[0] ?? null;
+  }
+
+  _reserveVoices(count, priority, { category = 'general', concurrencyGroup = null } = {}) {
+    if (!this.context || count <= 0) return false;
     this.activeVoices = this.activeVoices.filter((voice) => voice.end > this.context.currentTime && !voice.stopped);
-    while (this.activeVoices.length + count > this.maxSfxVoices) {
-      const candidate = this.activeVoices.slice().sort((a, b) => a.priority - b.priority || a.end - b.end)[0];
-      if (!candidate || candidate.priority > priority) return false;
-      candidate.stopped = true;
-      try { candidate.source.stop(); } catch { /* A scheduled source can already have ended. */ }
-      this.activeVoices = this.activeVoices.filter((entry) => entry !== candidate);
+    const categoryCap = AUDIO_CATEGORY_BUDGETS[category];
+    if (Number.isFinite(categoryCap)) {
+      if (count > categoryCap) return false;
+      while (this.activeVoices.filter((voice) => voice.category === category).length + count > categoryCap) {
+        const candidate = this._lowestPriorityVoice(this.activeVoices.filter((voice) => voice.category === category));
+        if (!candidate || candidate.priority > priority) return false;
+        this._stopVoice(candidate);
+      }
     }
+    while (this.activeVoices.length + count > this.maxSfxVoices) {
+      const candidate = this._lowestPriorityVoice(this.activeVoices);
+      if (!candidate || candidate.priority > priority) return false;
+      this._stopVoice(candidate);
+    }
+    void concurrencyGroup;
     return true;
   }
 
@@ -282,7 +373,7 @@ export class AudioDirector {
     gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
     oscillator.connect(gain);
     const spatial = this._connectSpatial(gain, destination, pan);
-    const voice = { source: oscillator, end: at + duration + 0.025, priority, stopped: false };
+    const voice = { source: oscillator, end: at + duration + 0.025, priority, stopped: false, category: 'general', concurrencyGroup: null };
     this.activeVoices.push(voice);
     oscillator.onended = () => { voice.stopped = true; try { oscillator.disconnect(); gain.disconnect(); if (spatial !== destination) spatial.disconnect(); } catch { /* Nodes may already be collected. */ } };
     oscillator.start(at); oscillator.stop(voice.end);
@@ -302,16 +393,23 @@ export class AudioDirector {
     gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
     source.connect(filter); filter.connect(gain);
     const spatial = this._connectSpatial(gain, destination, pan);
-    const voice = { source, end: at + duration + 0.02, priority, stopped: false };
+    const voice = { source, end: at + duration + 0.02, priority, stopped: false, category: 'general', concurrencyGroup: null };
     this.activeVoices.push(voice);
     source.onended = () => { voice.stopped = true; try { source.disconnect(); filter.disconnect(); gain.disconnect(); if (spatial !== destination) spatial.disconnect(); } catch { /* Nodes may already be collected. */ } };
     source.start(at, Math.random() * 0.25, duration); source.stop(voice.end);
   }
 
   debug() {
+    const live = this.activeVoices.filter((voice) => !voice.stopped && (!this.context || voice.end > this.context.currentTime));
     return {
-      unlocked: Boolean(this.context), state: this.context?.state ?? 'locked', activeVoices: this.activeVoices.filter((voice) => !voice.stopped).length,
-      maxSfxVoices: this.maxSfxVoices, sampleBank: { decoded: this.samples.size, loading: this.sampleLoads.size, failed: this.sampleFailures.size }, buses: Object.keys(this.buses), music: this.music?.debug() ?? { state: 'locked', cueId: null, activeVoices: 0 }
+      unlocked: Boolean(this.context),
+      state: this.context?.state ?? 'locked',
+      activeVoices: live.length,
+      maxSfxVoices: this.maxSfxVoices,
+      categoryVoices: Object.fromEntries(AUDIO_DEBUG_CATEGORIES.map((category) => [category, live.filter((voice) => (voice.category ?? 'general') === category).length])),
+      sampleBank: { decoded: this.samples.size, loading: this.sampleLoads.size, failed: this.sampleFailures.size },
+      buses: Object.keys(this.buses),
+      music: this.music?.debug() ?? { state: 'locked', cueId: null, activeVoices: 0 }
     };
   }
 }
