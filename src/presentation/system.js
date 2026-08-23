@@ -83,7 +83,12 @@ export class GamePresentationSystem {
     this.lastResolvedClipSignature = ''; this.musicOverride = null; this.characterClassOverride = null; this.animationOverride = null; this.debugEnabled = false;
     this.releaseDebugAllowed = Boolean(import.meta?.env?.DEV) || this.settings.presentationDebug === true;
     this.debugOverrides = { musicIntensity: null }; this.frameTimes = []; this.updateCost = 0; this.maxUpdateCost = 0; this.errorLog = [];
-    this.unsubscribers = bridgeLegacyPresentationEvents(game, this.eventBus); this._bindEvents(); this.attach(game);
+    this.unsubscribers = bridgeLegacyPresentationEvents(game, this.eventBus);
+    const hunterIntrusionUnsubscribe = game?.domainEvents?.on?.('hunter:intrusion', (detail) => {
+      this.eventBus.emit('hunter:intrusion', { ...detail, entityId: detail?.enemyId }, { time: this.game?.clock ?? 0, source: 'domain-events', priority: 9 });
+    });
+    if (hunterIntrusionUnsubscribe) this.unsubscribers.push(hunterIntrusionUnsubscribe);
+    this._bindEvents(); this.attach(game);
   }
   attach(game) {
     if (!game) return; this.game = game; game.presentation = this; game.bindPresentation?.(this); this.impactSystem.attach(game); this.animationDirector.attach(game); this.audio?.attach(game, this.eventBus);
@@ -151,7 +156,7 @@ export class GamePresentationSystem {
       this.eventBus.emit('animation:resurrection', { entityId: player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 });
     });
     [
-      'context:changed', 'animation:footstep', 'combat:attack-start', 'combat:attack-impact', 'combat:enemy-telegraph', 'combat:enemy-impact',
+      'context:changed', 'hunter:intrusion', 'animation:footstep', 'combat:attack-start', 'combat:attack-impact', 'combat:enemy-telegraph', 'combat:enemy-impact',
       'combat:boss-stagger', 'boss:signature-cue', 'loot:spawn', 'legacy:loot', 'legacy:boss-defeated', 'legacy:sound'
     ].forEach((type) => this.eventBus.on(type, (event) => this._resolveAudioEvent(event)));
     this.eventBus.on('presentation:error', (event) => { this.errorLog.push({ time: this.game?.clock ?? 0, ...event.detail }); this.errorLog.length = Math.min(40, this.errorLog.length); });
