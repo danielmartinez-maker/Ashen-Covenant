@@ -23,6 +23,8 @@ const FOOTSTEP_SAMPLE = {
   stone: 'footstep-stone.wav', wood: 'footstep-dirt.wav', metal: 'footstep-metal.wav', dirt: 'footstep-dirt.wav', grass: 'footstep-dirt.wav',
   mud: 'footstep-mud.wav', water: 'footstep-water.wav', snow: 'footstep-ash.wav', sand: 'footstep-dirt.wav', bone: 'footstep-stone.wav', ash: 'footstep-ash.wav', ice: 'footstep-stone.wav'
 };
+const MIGRATED_LEGACY_SOUND_IDS = new Set(['dodge', 'enemy-windup', 'projectile-windup', 'boss-windup']);
+const isMigratedLegacySound = (id) => typeof id === 'string' && (MIGRATED_LEGACY_SOUND_IDS.has(id) || id.startsWith('weapon-'));
 
 const BUS_NAMES = ['music', 'exploration', 'combat', 'boss', 'stingers', 'cinematic', 'ui', 'dialogue', 'abilities', 'enemyAbilities', 'ambience', 'footsteps', 'impacts', 'destruction'];
 const AUDIO_DEBUG_CATEGORIES = ['enemyVocal', 'footstep', 'impact', 'ambience', 'general'];
@@ -58,7 +60,7 @@ export class AudioDirector {
     this.unsubscribers = [];
     if (presentationBus) {
       this.unsubscribers.push(presentationBus.on('legacy:sound', (event) => {
-        if (event.detail?.id === 'dodge') return;
+        if (isMigratedLegacySound(event.detail?.id)) return;
         this.play(event.detail.id, event.detail);
       }));
     } else if (game?.on) this.unsubscribers.push(game.on('sound', ({ id, ...detail }) => this.play(id, detail)));
