@@ -29,6 +29,20 @@ assert(storm.cadence > 1);
 assert.equal(iron.slots.length, enemies.filter((enemy) => ['melee','shield','brute','assassin','burrower'].includes(enemy.role)).length);
 assert(new Set(iron.slots.map((slot) => `${Math.round(slot.x)}:${Math.round(slot.y)}`)).size === iron.slots.length);
 
+// A new/restored run rewinds GameEngine.clock to zero. Cached directives from a
+// previous run must never be treated as fresh merely because now-cached.at is negative.
+const rewindDirector = new EnemyDirector({ minInterval: 0.12 });
+const rewindEnemies = enemies.slice(0, 3);
+const healthyDirective = rewindDirector.resolveGroup({
+  groupId: 'fixed-campaign-pack', factionId: 'blood', enemies: rewindEnemies,
+  player: { x: 0, y: 0, hp: 100, maxHp: 100 }, corpses: [], now: 100, covenant: {}
+});
+const woundedDirective = rewindDirector.resolveGroup({
+  groupId: 'fixed-campaign-pack', factionId: 'blood', enemies: rewindEnemies,
+  player: { x: 0, y: 0, hp: 20, maxHp: 100 }, corpses: [], now: 0, covenant: {}
+});
+assert.ok(woundedDirective.aggression > healthyDirective.aggression, 'clock rewind must invalidate cached enemy doctrine state');
+
 const before = director.stats.recomputes;
 for (let tick = 0; tick < 100; tick += 1) {
   for (let pack = 0; pack < 34; pack += 1) {
