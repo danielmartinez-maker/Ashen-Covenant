@@ -29,3 +29,5 @@ jobs:
         run: node scripts/v7-audio-registry.mjs
       - name: V7 semantic audio resolver
         run: node scripts/v7-audio-resolver.mjs
+      - name: V7 audio director
+        run: node scripts/v7-audio-director.mjs
