@@ -26,6 +26,13 @@ const uniqueStrings = (values, { allowed = null, max = 24, maxLength = 80 } = {}
   .filter((value) => !allowed || allowed.has(value)))]
   .slice(0, max);
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const reserveHunterId = (id) => {
+  const match = /^hunter-(\d+)$/.exec(id);
+  if (!match) return id;
+  const numeric = Number(match[1]);
+  if (Number.isSafeInteger(numeric) && numeric >= 0 && numeric < Number.MAX_SAFE_INTEGER) nextHunter = Math.max(nextHunter, numeric + 1);
+  return id;
+};
 
 function adaptationCandidates(context = {}) {
   const source = String(context.source ?? '').toLowerCase();
@@ -48,8 +55,10 @@ export class HunterSystem {
     const targetRewardId = typeof hunter.targetRewardId === 'string' && hunter.targetRewardId.trim()
       ? hunter.targetRewardId.slice(0, 96)
       : rewardForFaction[factionId] ?? 'black-lantern';
+    const storedId = text(hunter.id, null, 96);
+    const id = storedId ? reserveHunterId(storedId) : `hunter-${nextHunter++}`;
     return {
-      id: text(hunter.id, `hunter-${nextHunter++}`, 96),
+      id,
       name: text(hunter.name, 'Scarred Hunter', 120),
       templateId: text(hunter.templateId, 'mireling', 96),
       factionId,
