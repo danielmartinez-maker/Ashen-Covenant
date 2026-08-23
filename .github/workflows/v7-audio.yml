@@ -27,3 +27,5 @@ jobs:
       - run: npm ci
       - name: Certify v7 combat soundscape
         run: npm run test:v7:audio
+      - name: Required v7 audio load validation
+        run: node scripts/v7-audio-load-validation.mjs
