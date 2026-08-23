@@ -127,6 +127,21 @@ assert(
   'a newly started event must survive normalization even after terminal history reaches its cap'
 );
 
+// Regional summary fields must refer to the same terminal event. If event A
+// fails after event B has started in the same region, lastOutcome and
+// lastEventId must both describe A rather than mixing identities.
+const failureIdentityState = world.normalize(null);
+const failingEvent = world.startEvent(failureIdentityState, 'gravewake-rising', { zoneId: 'gravewake' });
+const newerRegionalEvent = world.startEvent(failureIdentityState, 'black-procession', { zoneId: 'gravewake' });
+assert.notEqual(failingEvent.id, newerRegionalEvent.id);
+world.failEvent(failureIdentityState, failingEvent.id, { outcome: 'overrun' });
+assert.equal(failureIdentityState.regions.gravewake.lastOutcome, 'overrun', 'failed-event outcome must become the region terminal outcome');
+assert.equal(
+  failureIdentityState.regions.gravewake.lastEventId,
+  failingEvent.id,
+  'failed-event identity must stay paired with the region terminal outcome'
+);
+
 const { GameEngine } = await import('../src/systems/game.js');
 const input = { pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; }, isHeld() { return false; }, consume() { return false; }, defer() {}, rumble() {} };
 const make = () => new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 } }, { reducedVfx: true });
