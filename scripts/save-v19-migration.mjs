@@ -44,6 +44,29 @@ assert.equal(migrated.player.worldV2.regions.gravewake.threat, 41);
 assert.equal(migrated.player.sanctuary.level, 1);
 assert.equal(migrated.stats.kills, 101);
 
+// Migration is a trust boundary. A save that claims to already be v19 must not
+// bypass normalization and leak hostile/non-finite numeric values downstream.
+const hostileCurrent = SaveMigrator.migrate({
+  version: SAVE_SCHEMA_V19,
+  player: {
+    covenant: { affinities: { grave: 'Infinity' }, stage: 'Infinity', instability: '-Infinity' },
+    worldV2: { regions: {}, activeEvents: [], resolvedEvents: [], procession: null, tick: 'Infinity' },
+    sanctuary: { level: 'Infinity', flags: {}, merchants: {}, npcs: {}, architecture: [], discoveries: [] },
+    hunters: [],
+    mutationProgress: { credits: 'Infinity', selections: {}, unlocked: [], legacyConverted: true }
+  }
+});
+assert.equal(hostileCurrent.version, SAVE_SCHEMA_V19);
+assert.ok(Number.isFinite(hostileCurrent.player.worldV2.tick), 'current-schema world tick must remain finite');
+assert.ok(hostileCurrent.player.worldV2.tick >= 0 && hostileCurrent.player.worldV2.tick <= Number.MAX_SAFE_INTEGER);
+assert.ok(Number.isSafeInteger(hostileCurrent.player.mutationProgress.credits), 'current-schema mutation credits must remain a safe integer');
+assert.ok(hostileCurrent.player.mutationProgress.credits >= 0 && hostileCurrent.player.mutationProgress.credits <= 1_000_000);
+assert.ok(Number.isFinite(hostileCurrent.player.sanctuary.level) && hostileCurrent.player.sanctuary.level >= 1 && hostileCurrent.player.sanctuary.level <= 5);
+assert.ok(Number.isFinite(hostileCurrent.player.covenant.affinities.grave) && hostileCurrent.player.covenant.affinities.grave >= 0 && hostileCurrent.player.covenant.affinities.grave <= 100);
+assert.ok(Number.isFinite(hostileCurrent.player.covenant.instability) && hostileCurrent.player.covenant.instability >= 0 && hostileCurrent.player.covenant.instability <= 100);
+const hostileCurrentSecond = SaveMigrator.migrate(hostileCurrent);
+assert.deepEqual(hostileCurrentSecond, hostileCurrent, 'hostile current-schema normalization must be idempotent');
+
 const second = SaveMigrator.migrate(migrated);
 assert.deepEqual(second, migrated, 'v19 migration must be idempotent');
 console.log('Ashen Covenant v19 migration/domain-event regression passed.');
