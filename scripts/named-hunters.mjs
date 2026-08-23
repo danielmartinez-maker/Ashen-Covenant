@@ -17,6 +17,22 @@ assert.equal(system.chooseIntrusion([evolved], { now: 21, zoneId: 'redfen' }), n
 evolved = { ...evolved, nextEligibleAt: 0 };
 assert.equal(system.chooseIntrusion([evolved], { now: 100, zoneId: 'redfen' })?.id, evolved.id);
 
+// Normalization is used during save restoration and intrusion selection. Reading
+// an existing Hunter must not consume future generated IDs.
+const allocatorBefore = system.createFromVictor(
+  { templateId: 'mireling', name: 'Allocator Probe', level: 2, doctrineFaction: 'grave' },
+  { source: 'melee', now: 200 }
+);
+const beforeNumber = Number(allocatorBefore.id.match(/^hunter-(\d+)$/)?.[1]);
+assert.ok(Number.isSafeInteger(beforeNumber));
+for (let index = 0; index < 8; index += 1) system.normalize(allocatorBefore);
+const allocatorAfter = system.createFromVictor(
+  { templateId: 'mireling', name: 'Allocator Probe Two', level: 2, doctrineFaction: 'grave' },
+  { source: 'melee', now: 201 }
+);
+const afterNumber = Number(allocatorAfter.id.match(/^hunter-(\d+)$/)?.[1]);
+assert.equal(afterNumber, beforeNumber + 1, 'normalizing an existing Hunter must not advance the ID allocator');
+
 const decorated = system.decorateEnemy({ hp: 200, maxHp: 200, damage: 25, speed: 180, armor: 4, shield: 0, affixes: [], name: 'Reed Stalker' }, evolved);
 assert.equal(decorated.hunterId, evolved.id);
 assert(decorated.maxHp > 200 && decorated.damage > 25);
