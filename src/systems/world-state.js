@@ -179,9 +179,22 @@ export class WorldStateManager {
     const zoneId = ZONES.some((zone) => zone.id === context.zoneId && !zone.safe) ? context.zoneId : definition.zoneId;
     const duplicate = state.activeEvents.find((event) => event.typeId === typeId && event.zoneId === zoneId);
     if (duplicate) return duplicate;
-    const sequence = state.activeEvents.length + state.resolvedEvents.length + 1;
+
+    const retainedEvents = [...state.activeEvents, ...state.resolvedEvents];
+    const retainedIds = new Set(retainedEvents.map((event) => event.id));
+    const highestRetainedSequence = retainedEvents.reduce((highest, event) => {
+      const match = typeof event.id === 'string' ? event.id.match(/-(\d+)$/) : null;
+      return match ? Math.max(highest, integer(match[1], 0, 0, Number.MAX_SAFE_INTEGER - 1)) : highest;
+    }, 0);
+    let sequence = Math.max(state.activeEvents.length + state.resolvedEvents.length + 1, highestRetainedSequence + 1);
+    let eventId = `world-${typeId}-${Math.floor(state.tick)}-${sequence}`;
+    while (retainedIds.has(eventId) && sequence < Number.MAX_SAFE_INTEGER) {
+      sequence += 1;
+      eventId = `world-${typeId}-${Math.floor(state.tick)}-${sequence}`;
+    }
+
     const event = this.#normalizeEvent({
-      id: `world-${typeId}-${Math.floor(state.tick)}-${sequence}`,
+      id: eventId,
       typeId,
       zoneId,
       startedAt: state.tick,
