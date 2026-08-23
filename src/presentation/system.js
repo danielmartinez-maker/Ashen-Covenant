@@ -102,21 +102,29 @@ export class GamePresentationSystem {
     const detail = event?.detail ?? {};
     if (detail.actor && typeof detail.actor === 'object') return detail.actor;
     if (detail.enemy && typeof detail.enemy === 'object') return detail.enemy;
-    const explicit = this._entityById(detail.entityId ?? detail.actorId ?? detail.sourceId);
+    if (event?.type === 'combat:attack-impact') return this.game?.player ?? null;
+    const explicit = this._entityById(detail.actorId ?? detail.sourceId ?? detail.entityId);
     if (explicit) return explicit;
     if (['boss:signature-cue', 'combat:boss-stagger', 'legacy:boss-defeated'].includes(event?.type)) {
       return this.game?.getBoss?.() ?? this.game?.entities?.enemies?.find((enemy) => enemy?.boss) ?? this.game?.player;
     }
     return this.game?.player ?? null;
   }
-  _audioTargetFor(detail = {}) {
+  _audioTargetFor(event) {
+    const detail = event?.detail ?? {};
     if (detail.target && typeof detail.target === 'object') return detail.target;
+    if (event?.type === 'combat:attack-impact') {
+      return this._entityById(detail.entityId ?? detail.targetId ?? detail.victimId) ?? null;
+    }
+    if (event?.type === 'combat:enemy-impact') {
+      return this._entityById(detail.targetId ?? detail.victimId) ?? this.game?.player ?? null;
+    }
     return this._entityById(detail.targetId ?? detail.victimId) ?? null;
   }
   _resolveAudioEvent(event) {
     if (!event || !this.audioResolver) return null;
     const actor = this._audioActorFor(event);
-    const target = this._audioTargetFor(event.detail);
+    const target = this._audioTargetFor(event);
     const context = this.combatContextResolver.resolve(this.game, event.detail, { actor, target, eventType: event.type });
     const resolved = this.audioResolver.resolve(event.type, event.detail, context, event.id);
     if (!resolved) return null;
