@@ -91,4 +91,12 @@ assert.ok(game.player.presentation.actionProgress > 0 && game.player.presentatio
 assert.ok(Number.isFinite(game.player.presentation.locomotionProgress), 'AnimationDirector must publish normalized locomotion progress');
 assert.equal(game.player.presentation.combatContext.actionProgress, game.player.presentation.actionProgress, 'combat context must consume published action progress');
 
+// Legacy animation state must continue to advance v7 non-timeline clips such as death.
+presentation.animationDirector.timeline.clear(game);
+game.player.animation = { type: 'death', duration: 2, time: 1, angle: game.player.facing };
+game.player.deathTime = 1;
+presentation.update(1 / 60);
+assert.equal(game.player.presentation.resolvedClip.semanticState, 'death');
+assert.ok(Math.abs(game.player.presentation.resolvedClip.progress - 0.5) < 0.001, 'death clip must inherit progress from the active legacy animation when no authored action timeline exists');
+
 console.log('Ashen Covenant v7 animation clip contract regression passed.');
