@@ -50,6 +50,28 @@ const ghostProcession = world.normalize({
 });
 assert.equal(ghostProcession.procession, null, 'orphaned Procession state must be discarded during normalization');
 
+// Event IDs are persistent identities. A corrupt save that repeats the same
+// active event must not stack that event's pressure multiple times or leave a
+// phantom duplicate behind after the event resolves.
+const duplicateEventState = world.normalize({
+  tick: 45,
+  activeEvents: [
+    { id: 'world-duplicate-event', typeId: 'blood-moon-hunt', zoneId: 'redfen', startedAt: 5, elapsed: 40, duration: 210, progress: 0, target: 1 },
+    { id: 'world-duplicate-event', typeId: 'blood-moon-hunt', zoneId: 'redfen', startedAt: 5, elapsed: 40, duration: 210, progress: 0, target: 1 }
+  ]
+});
+assert.equal(
+  duplicateEventState.activeEvents.filter((event) => event.id === 'world-duplicate-event').length,
+  1,
+  'duplicate persisted active-event IDs must collapse to one normalized event'
+);
+world.resolveEvent(duplicateEventState, 'world-duplicate-event', { outcome: 'cleared' });
+assert.equal(
+  duplicateEventState.activeEvents.some((event) => event.id === 'world-duplicate-event'),
+  false,
+  'resolving a normalized event must not leave a duplicate active event behind'
+);
+
 const { GameEngine } = await import('../src/systems/game.js');
 const input = { pointer: { active: false, worldX: 0, worldY: 0 }, tick() {}, updateWorldPointer() {}, getMove() { return { x: 0, y: 0, moving: false }; }, isHeld() { return false; }, consume() { return false; }, defer() {}, rumble() {} };
 const make = () => new GameEngine(input, { viewport: { width: 1280, height: 720, scale: 1 } }, { reducedVfx: true });
