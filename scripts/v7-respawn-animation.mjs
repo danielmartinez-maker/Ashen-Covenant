@@ -26,11 +26,19 @@ const presentation = new GamePresentationSystem(game, { input, settings: game.se
 assert.equal(game.start('warden', 'thornseer'), true);
 
 presentation.animationDirector.timeline.clear(game);
+game.player.presentation ??= {};
+game.player.presentation.reaction = { direction: 1.25, time: 0.3, duration: 0.3, tier: 'heavy' };
 game.player.animation = { type: 'death', duration: 2.6, time: 0.01, angle: game.player.facing };
 game.player.deathTime = 0.01;
 game._respawn();
-presentation.update(0);
 
+assert.equal(
+  game.player.presentation?.reaction ?? null,
+  null,
+  'respawn must clear the fatal-hit presentation reaction before the authored rise begins'
+);
+
+presentation.update(0);
 assert.equal(
   game.player.presentation.resolvedClip.semanticState,
   'rise',
