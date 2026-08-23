@@ -85,7 +85,6 @@ export class GamePresentationSystem {
     this.eventBus.on('legacy:campaign-dialogue', (event) => this.cinematic.start(event.detail.id ?? 'campaign-dialogue', { kind: 'narrative', game: this.game }));
     this.eventBus.on('legacy:boss-phase', (event) => {
       const enemy = event.detail.enemy;
-      if (enemy) { enemy.phaseTransition = Math.max(enemy.phaseTransition ?? 0, enemy.boss ? 0.78 : 0.42); enemy.windupLeft = 0; enemy.telegraph = null; enemy.state = 'phase-transition'; }
       const covenant = this.game?.getCovenantOverview?.();
       const cue = bossSignatureCue(enemy?.templateId ?? 'boss', covenant?.primary ?? 'unbound', event.detail.phase ?? enemy?.phase ?? 1);
       this.eventBus.emit('boss:signature-cue', cue, { time: this.game?.clock ?? 0, source: 'boss-presentation', priority: 94 });
