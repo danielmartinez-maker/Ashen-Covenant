@@ -49,4 +49,9 @@ for (const asset of Object.values(AUDIO_ASSETS_V7).filter((entry) => !entry.lega
   assert.ok(bytes.length > 44 + 48000 * 2 * 0.05, `${asset.id} must contain audible data`);
 }
 
+const { validateV7AudioData } = await import('../src/presentation/validator.js');
+const validation = validateV7AudioData();
+assert.equal(validation.valid, true, validation.issues.map((entry) => `${entry.code}: ${entry.message}`).join('\n'));
+assert.equal(validation.summary.semanticEvents, AUDIO_REQUIRED_EVENT_FAMILIES.length);
+
 console.log('Ashen Covenant v7 semantic audio registry regression passed.');
