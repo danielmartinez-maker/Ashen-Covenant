@@ -32,7 +32,12 @@ export class CinematicPresentationController {
     this.end({ game, completed: true }); return true;
   }
   update(game) { if (this.active && !game?.pendingCampaignDialogue && this.kind === 'narrative') this.end({ game, completed: true }); }
-  resetTransient() { this.active = false; this.id = null; this.kind = null; }
+  resetTransient(game = null) {
+    const wasActive = this.active;
+    this.active = false; this.id = null; this.kind = null;
+    if (wasActive) this.bus?.emit('music:duck', { active: false, amount: 1 }, { time: game?.clock ?? 0, source: 'cinematic-controller' });
+    return wasActive;
+  }
   debug() { return { active: this.active, id: this.id, kind: this.kind, completed: this.completed.size, lastSkip: this.lastSkip }; }
 }
 
@@ -92,7 +97,7 @@ export class GamePresentationSystem {
       this.eventBus.emit('camera:profile', { profileId: 'boss', signature: cue.id }, { time: this.game?.clock ?? 0, source: 'boss-presentation' });
     });
     this.eventBus.on('legacy:boss-defeated', () => this.eventBus.emit('music:stinger', { id: 'boss-defeat' }, { time: this.game?.clock ?? 0, source: 'boss-presentation', priority: 98 }));
-    this.eventBus.on('legacy:player-dead', () => { this.animationDirector.timeline.clear(this.game); this.cinematic.resetTransient(); this.eventBus.emit('animation:death', { entityId: this.game?.player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 }); });
+    this.eventBus.on('legacy:player-dead', () => { this.animationDirector.timeline.clear(this.game); this.cinematic.resetTransient(this.game); this.eventBus.emit('animation:death', { entityId: this.game?.player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 }); });
     this.eventBus.on('legacy:respawned', () => { this.animationDirector.timeline.clear(this.game); this.eventBus.emit('animation:resurrection', { entityId: this.game?.player?.id }, { time: this.game?.clock ?? 0, source: 'presentation-system', priority: 100 }); });
     this.eventBus.on('presentation:error', (event) => { this.errorLog.push({ time: this.game?.clock ?? 0, ...event.detail }); this.errorLog.length = Math.min(40, this.errorLog.length); });
   }
