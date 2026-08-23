@@ -23,7 +23,11 @@ const FOOTSTEP_SAMPLE = {
   stone: 'footstep-stone.wav', wood: 'footstep-dirt.wav', metal: 'footstep-metal.wav', dirt: 'footstep-dirt.wav', grass: 'footstep-dirt.wav',
   mud: 'footstep-mud.wav', water: 'footstep-water.wav', snow: 'footstep-ash.wav', sand: 'footstep-dirt.wav', bone: 'footstep-stone.wav', ash: 'footstep-ash.wav', ice: 'footstep-stone.wav'
 };
-const MIGRATED_LEGACY_SOUND_IDS = new Set(['dodge', 'enemy-windup', 'projectile-windup', 'boss-windup']);
+const MIGRATED_LEGACY_SOUND_IDS = new Set([
+  'dodge',
+  'enemy-windup', 'projectile-windup', 'boss-windup',
+  'enemy-attack', 'enemy-heavy', 'boss-attack'
+]);
 const isMigratedLegacySound = (id) => typeof id === 'string' && (MIGRATED_LEGACY_SOUND_IDS.has(id) || id.startsWith('weapon-'));
 
 const BUS_NAMES = ['music', 'exploration', 'combat', 'boss', 'stingers', 'cinematic', 'ui', 'dialogue', 'abilities', 'enemyAbilities', 'ambience', 'footsteps', 'impacts', 'destruction'];
@@ -98,8 +102,6 @@ export class AudioDirector {
     this.buses.music.disconnect();
     this.buses.music.connect(this.musicDuck);
     this.musicDuck.connect(this.master);
-    // Context buses are routed through their shared category parents while
-    // remaining independently addressable for debug and future stem assets.
     this.buses.exploration.disconnect(); this.buses.exploration.connect(this.buses.music);
     this.buses.combat.disconnect(); this.buses.combat.connect(this.buses.music);
     this.buses.boss.disconnect(); this.buses.boss.connect(this.buses.music);
@@ -194,15 +196,7 @@ export class AudioDirector {
     source.connect(gain);
     const spatial = this._connectSpatial(gain, destination, pan);
     const duration = Math.max(0.025, buffer.duration / Math.max(0.68, Number(pitch) || 1));
-    const voice = {
-      source,
-      end: at + duration + 0.015,
-      priority,
-      stopped: false,
-      sampled: true,
-      category: metadata.category ?? 'general',
-      concurrencyGroup: metadata.concurrencyGroup ?? null
-    };
+    const voice = { source, end: at + duration + 0.015, priority, stopped: false, sampled: true, category: metadata.category ?? 'general', concurrencyGroup: metadata.concurrencyGroup ?? null };
     this.activeVoices.push(voice);
     source.onended = () => { voice.stopped = true; try { source.disconnect(); gain.disconnect(); if (spatial !== destination) spatial.disconnect(); } catch { /* Nodes may already be collected. */ } };
     source.start(at);
@@ -280,16 +274,7 @@ export class AudioDirector {
       const layerConcurrencyGroup = layer.concurrencyGroup ?? resolved.semanticId ?? null;
       if (!this._reserveVoices(1, priority, { category, concurrencyGroup: layerConcurrencyGroup })) continue;
       const destination = this.buses[layer.bus] ?? this.buses.abilities;
-      played = this._sample(
-        now,
-        assetId,
-        destination,
-        priority,
-        layer.pitch ?? 1,
-        clamp(Number(layer.gain ?? 1), 0, 1.5),
-        layer.pan ?? 0,
-        { category, concurrencyGroup: layerConcurrencyGroup }
-      ) || played;
+      played = this._sample(now, assetId, destination, priority, layer.pitch ?? 1, clamp(Number(layer.gain ?? 1), 0, 1.5), layer.pan ?? 0, { category, concurrencyGroup: layerConcurrencyGroup }) || played;
     }
     if (played) this.lastResolvedSound.set(concurrencyGroup, now);
     return played;
