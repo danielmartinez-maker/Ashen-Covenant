@@ -81,4 +81,17 @@ const critical = Object.freeze({
 assert.equal(audio.playResolved(critical), true, 'critical boss cues must remain admissible under load');
 assert.ok(audio.debug().activeVoices <= 36);
 
+let failedFetches = 0;
+globalThis.fetch = async () => {
+  failedFetches += 1;
+  return { ok: false, status: 503, arrayBuffer: async () => new ArrayBuffer(0) };
+};
+const failing = new AudioDirector({ sound: true });
+failing.context = new FakeAudioContext();
+assert.equal(await failing.preloadV7Required(), false, 'required decode/fetch failure must fail preload closed');
+assert.ok(failing.sampleFailures.size > 0, 'failed required assets must be recorded');
+const firstFailureFetches = failedFetches;
+assert.equal(await failing.preloadV7Required(), false);
+assert.equal(failedFetches, firstFailureFetches, 'known failed required assets must not be refetched repeatedly');
+
 console.log('Ashen Covenant v7 audio director regression passed.');
