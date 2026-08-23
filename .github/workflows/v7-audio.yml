@@ -15,7 +15,7 @@ concurrency:
 jobs:
   audio:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       npm_config_engine_strict: true
     steps:
@@ -25,15 +25,5 @@ jobs:
           node-version: 22.12.0
           cache: npm
       - run: npm ci
-      - name: V7 semantic audio registry
-        run: node scripts/v7-audio-registry.mjs
-      - name: V7 semantic audio resolver
-        run: node scripts/v7-audio-resolver.mjs
-      - name: V7 audio director
-        run: node scripts/v7-audio-director.mjs
-      - name: V7 audio orchestration
-        run: node scripts/v7-audio-integration.mjs
-      - name: Adaptive music regression
-        run: node scripts/adaptive-music.mjs
-      - name: Legacy presentation audio regression
-        run: node scripts/presentation-overhaul.mjs
+      - name: Certify v7 combat soundscape
+        run: npm run test:v7:audio
