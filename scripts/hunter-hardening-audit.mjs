@@ -39,6 +39,21 @@ assert.ok(normalized.victories <= 1_000_000, 'Hunter victories must be bounded')
 assert.ok(normalized.grudge <= 99, 'Hunter grudge must remain within the runtime grudge scale');
 assert.equal(normalized.defeated, false, 'only an explicit boolean true may mark a Hunter defeated');
 
+const forgedRewardHunter = system.normalize({
+  factionId: 'iron',
+  targetRewardId: 'definitely-not-a-real-hunter-bounty'
+});
+assert.equal(
+  forgedRewardHunter.targetRewardId,
+  'unbowed-pact',
+  'persisted Hunter bounty IDs must normalize to an authored reward for the normalized faction'
+);
+assert.equal(
+  system.recordDefeat(forgedRewardHunter, { now: 1 }).rewardId,
+  'unbowed-pact',
+  'a forged persisted Hunter bounty must not suppress the authored defeat reward'
+);
+
 const store = new Map();
 globalThis.localStorage = {
   getItem: (key) => store.get(key) ?? null,
