@@ -135,6 +135,12 @@ presentation.requestImpact('critical', { x: game.player.x, y: game.player.y });
 assert.ok(game.hitStop > .02 && game.hitStop < .024, 'hit-stop accessibility scale must modify the shared impact profile');
 assert.ok(game.camera.flash <= .025, 'reduced flashing must constrain impact flash');
 
+// Invalid/zero impulse durations must never poison camera state with NaN.
+presentation.impactSystem.camera.impulses.length = 0;
+presentation.impactSystem.camera.impulse(5, 0, 0, game);
+presentation.impactSystem.camera.update(game, 1 / 60, { cameraProfile: 'exploration' });
+assert.ok(Number.isFinite(game.camera.presentationShake), 'zero-duration camera impulse must keep presentationShake finite');
+
 const destructible = game.entities.destructibles.find((entry) => entry.kind === 'urn');
 assert.ok(destructible && DESTRUCTIBLE_PROFILES.urn);
 game._damageDestructible(destructible, 1, 'test-strike');
