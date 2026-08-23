@@ -94,7 +94,10 @@ bridgeBus.emit('legacy:sound', { id: 'weapon-longsword-light' });
 bridgeBus.emit('legacy:sound', { id: 'enemy-windup' });
 bridgeBus.emit('legacy:sound', { id: 'projectile-windup' });
 bridgeBus.emit('legacy:sound', { id: 'boss-windup' });
-assert.deepEqual(legacyPlays, [], 'migrated attack and telegraph cues must not double-play through the legacy bridge');
+bridgeBus.emit('legacy:sound', { id: 'enemy-attack' });
+bridgeBus.emit('legacy:sound', { id: 'enemy-heavy' });
+bridgeBus.emit('legacy:sound', { id: 'boss-attack' });
+assert.deepEqual(legacyPlays, [], 'migrated attack, telegraph, and enemy impact cues must not double-play through the legacy bridge');
 bridgeBus.emit('legacy:sound', { id: 'potion' });
 assert.deepEqual(legacyPlays, ['potion'], 'unmigrated legacy cues must remain compatible');
 
