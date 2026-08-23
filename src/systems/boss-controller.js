@@ -14,6 +14,10 @@ export const BOSS_DEFINITIONS = Object.freeze({
 });
 
 const affinities = new Set(['flame','grave','blood','light','storm','void']);
+const safeAttackCount = (enemy) => {
+  const count = Number(enemy?.attackCount);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+};
 
 export class BossController {
   constructor(domainEvents = null) {
@@ -47,7 +51,8 @@ export class BossController {
       modifiers: affinity === 'base' ? [] : [`${affinity}-pressure`, phaseNumber >= 3 ? `${affinity}-apex` : null].filter(Boolean),
       intermission: changed ? phaseDef.intermission : 0,
       punishWindow: phaseDef.punish,
-      enteredAt: changed ? now : previous?.enteredAt ?? now
+      enteredAt: changed ? now : previous?.enteredAt ?? now,
+      phaseAttackOffset: changed ? safeAttackCount(enemy) : previous?.phaseAttackOffset ?? 0
     };
     this.states.set(enemy.id, state);
     if (changed) {
@@ -67,8 +72,9 @@ export class BossController {
     const resolved = state ?? this.states.get(enemy.id) ?? this.update(enemy, {});
     const phaseDef = definition.phases[Math.max(0, Math.min(2, (resolved.phase ?? 1) - 1))];
     const mechanics = phaseDef.mechanics;
-    const attackCount = Number(enemy.attackCount);
-    const launchedIndex = Number.isFinite(attackCount) && attackCount > 0 ? Math.floor(attackCount) - 1 : 0;
+    const phaseAttackOffset = Number.isFinite(Number(resolved.phaseAttackOffset)) ? Math.max(0, Math.floor(Number(resolved.phaseAttackOffset))) : 0;
+    const attackCount = safeAttackCount(enemy);
+    const launchedIndex = attackCount > 0 ? Math.max(0, attackCount - phaseAttackOffset - 1) : 0;
     const index = launchedIndex % mechanics.length;
     const id = mechanics[index];
     return {
