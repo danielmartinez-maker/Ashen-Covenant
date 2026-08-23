@@ -29,6 +29,30 @@ assert.equal(converted.legacyConverted, true);
 const firstCredits = converted.credits;
 assert.equal(system.convertLegacy(hostilePlayer, 'warden').credits, firstCredits, 'hostile legacy conversion remains idempotent');
 
+const invalidRanksPlayer = {
+  abilityMastery: {
+    attack: { rank: 'Infinity' },
+    skillOne: { rank: -999 },
+    skillTwo: { rank: 'not-a-number' }
+  },
+  reforged: { mastery: { ultimate: { rank: -100 } } },
+  mutationProgress: { credits: 7, selections: {}, unlocked: [], legacyConverted: false }
+};
+assert.equal(system.convertLegacy(invalidRanksPlayer, 'warden').credits, 7, 'invalid and negative legacy mastery ranks must not create or remove credits');
+
+const extremeFinitePlayer = {
+  abilityMastery: { attack: { rank: 1e99 } },
+  mutationProgress: { credits: 5, selections: {}, unlocked: [], legacyConverted: false }
+};
+assert.equal(system.convertLegacy(extremeFinitePlayer, 'warden').credits, 1_000_000, 'extreme finite legacy ranks must saturate at the mutation credit ceiling');
+
+const ordinaryPlayer = {
+  abilityMastery: { attack: { rank: 4 }, skillOne: { rank: 3 } },
+  reforged: { mastery: { skillTwo: { rank: 2 } } },
+  mutationProgress: { credits: 1, selections: {}, unlocked: [], legacyConverted: false }
+};
+assert.equal(system.convertLegacy(ordinaryPlayer, 'warden').credits, 5, 'ordinary legacy mastery conversion must preserve existing half-rank credit behavior');
+
 const malformedContainers = {
   skillImprints: 'bad',
   abilityMastery: ['bad'],
