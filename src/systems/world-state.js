@@ -107,16 +107,17 @@ export class WorldStateManager {
     if (input.procession && Object.keys(processionRaw).length) {
       const eventId = safeText(processionRaw.eventId, '', 120);
       const linkedEvent = activeEvents.find((event) => event.id === eventId && event.typeId === 'black-procession');
-      const storedZone = PROCESSION_ROUTE.includes(processionRaw.zoneId) ? processionRaw.zoneId : PROCESSION_ROUTE[0];
-      const zoneId = linkedEvent && PROCESSION_ROUTE.includes(linkedEvent.zoneId) ? linkedEvent.zoneId : storedZone;
-      const routeIndex = Math.max(0, PROCESSION_ROUTE.indexOf(zoneId));
-      if (linkedEvent) linkedEvent.zoneId = zoneId;
-      procession = {
-        eventId,
-        zoneId,
-        routeIndex,
-        travel: bounded(processionRaw.travel, 0, 0, 30)
-      };
+      if (linkedEvent) {
+        const zoneId = PROCESSION_ROUTE.includes(linkedEvent.zoneId) ? linkedEvent.zoneId : PROCESSION_ROUTE[0];
+        const routeIndex = Math.max(0, PROCESSION_ROUTE.indexOf(zoneId));
+        linkedEvent.zoneId = zoneId;
+        procession = {
+          eventId,
+          zoneId,
+          routeIndex,
+          travel: bounded(processionRaw.travel, 0, 0, 30)
+        };
+      }
     }
     return { regions, activeEvents, resolvedEvents, procession, tick: Math.max(0, finite(input.tick, 0)) };
   }
