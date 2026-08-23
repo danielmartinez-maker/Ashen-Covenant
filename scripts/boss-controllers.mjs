@@ -30,12 +30,27 @@ assert.deepEqual(
   [...phaseMechanics, phaseMechanics[0]],
   'runtime attackCount is incremented at windup start, so count 1 must select the first authored mechanic and wrap in authored order'
 );
-const voidState = controller.update({ ...boss, id: 'boss-void' }, { covenant: { primary: 'void' }, now: 3 });
+
+// A boss can spend an arbitrary number of attacks in phase 1. Entering a new
+// authored phase must still begin at that phase's opener without resetting the
+// lifetime attack counter used by legacy cadence and Covenant affinity effects.
+const phaseEntryBoss = { id: 'boss-phase-entry', templateId: 'cryptwarden', boss: true, maxHp: 1000, hp: 1000, attackCount: 5, phase: 1 };
+controller.update(phaseEntryBoss, { covenant: { primary: 'grave' }, now: 3 });
+phaseEntryBoss.hp = 600;
+const phaseEntryState = controller.update(phaseEntryBoss, { covenant: { primary: 'grave' }, now: 4 });
+const phaseEntryMechanics = BOSS_DEFINITIONS[phaseEntryBoss.templateId].phases[phaseEntryState.phase - 1].mechanics;
+assert.equal(
+  controller.nextMechanic({ ...phaseEntryBoss, attackCount: 6 }, phaseEntryState).id,
+  phaseEntryMechanics[0],
+  'first attack launched after a phase transition must start at the new phase authored opener regardless of lifetime attack count'
+);
+
+const voidState = controller.update({ ...boss, id: 'boss-void' }, { covenant: { primary: 'void' }, now: 5 });
 assert.notEqual(voidState.variantId, state.variantId, 'Covenant state can alter boss variant');
 assert(controller.nextMechanic(boss, voidState).tags.includes('void') || voidState.modifiers.length > 0);
 
 const blackRoadBoss = { id: 'black-road-crypt', templateId: 'cryptwarden', boss: true, maxHp: 1000, hp: 300, attackCount: 0, phase: 2 };
-assert.equal(controller.update(blackRoadBoss, { covenant: {}, now: 5 }).phase, 3, 'Funeral Road legacy final-phase boundary is 30% HP');
+assert.equal(controller.update(blackRoadBoss, { covenant: {}, now: 6 }).phase, 3, 'Funeral Road legacy final-phase boundary is 30% HP');
 
 console.log('Ashen Covenant authored BossController regression passed.');
 
