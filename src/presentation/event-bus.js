@@ -4,7 +4,7 @@ const EVENT_TYPES = [
   'combat:attack-start', 'combat:attack-impact', 'combat:enemy-telegraph', 'combat:enemy-impact', 'combat:boss-stagger',
   'impact:request', 'camera:profile', 'camera:impulse', 'music:state', 'music:stinger', 'music:duck', 'boss:signature-cue',
   'cinematic:start', 'cinematic:end', 'cinematic:skip', 'loot:spawn', 'world:transition',
-  'presentation:combat-context', 'animation:clip-resolved', 'presentation:error'
+  'presentation:combat-context', 'animation:clip-resolved', 'audio:semantic-resolved', 'presentation:error'
 ];
 
 export const PRESENTATION_EVENT_TYPES = Object.freeze(Object.fromEntries(EVENT_TYPES.map((type) => [type.toUpperCase().replaceAll(':', '_').replaceAll('-', '_'), type])));
