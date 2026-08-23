@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { AudioDirector } from '../src/systems/audio.js';
+import { PresentationEventBus } from '../src/presentation/event-bus.js';
 
 class Parameter {
   constructor(value = 1) { this.value = value; }
@@ -83,6 +84,19 @@ const critical = Object.freeze({
 });
 assert.equal(audio.playResolved(critical), true, 'critical boss cues must remain admissible under load');
 assert.ok(audio.debug().activeVoices <= 36);
+
+const bridgeAudio = new AudioDirector({ sound: true });
+const bridgeBus = new PresentationEventBus({ strict: true });
+const legacyPlays = [];
+bridgeAudio.play = (id) => { legacyPlays.push(id); return true; };
+bridgeAudio.attach({}, bridgeBus);
+bridgeBus.emit('legacy:sound', { id: 'weapon-longsword-light' });
+bridgeBus.emit('legacy:sound', { id: 'enemy-windup' });
+bridgeBus.emit('legacy:sound', { id: 'projectile-windup' });
+bridgeBus.emit('legacy:sound', { id: 'boss-windup' });
+assert.deepEqual(legacyPlays, [], 'migrated attack and telegraph cues must not double-play through the legacy bridge');
+bridgeBus.emit('legacy:sound', { id: 'potion' });
+assert.deepEqual(legacyPlays, ['potion'], 'unmigrated legacy cues must remain compatible');
 
 let failedFetches = 0;
 globalThis.fetch = async () => {
