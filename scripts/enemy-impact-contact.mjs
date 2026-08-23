@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { GameEngine } from '../src/systems/game.js';
+import { GamePresentationSystem } from '../src/presentation/system.js';
 
 const store = new Map();
 globalThis.localStorage = {
@@ -20,12 +21,13 @@ const renderer = { viewport: { width: 1280, height: 720, scale: 1 }, getAssetSta
 const game = new GameEngine(input, renderer, { sound: false, reducedVfx: true });
 assert.equal(game.start('warden', 'thornseer'), true);
 
-const presentationEvents = [];
-game.presentation = {
-  emit(type, detail = {}) { presentationEvents.push({ type, detail }); },
-  requestImpact() {},
-  animationDirector: { reactEnemy() {} }
+const played = [];
+const audio = {
+  attach() {}, update() {},
+  playResolved(event) { played.push(event); return true; },
+  debug() { return { activeVoices: 0, categoryVoices: {} }; }
 };
+new GamePresentationSystem(game, { input, settings: game.settings, audio, strictEvents: true });
 
 const enemy = game._spawnEnemy('mireling', game.player.x + 180, game.player.y, { group: 'contact-audit', level: 1 });
 enemy.role = 'melee';
@@ -40,17 +42,18 @@ enemy.telegraph = {
   life: 0.1, maxLife: 0.1, kind: enemy.attack
 };
 
-// The player is behind the enemy and outside the authored cone. Resolving the
-// attack may animate/recover, but must not publish a physical-contact event.
-presentationEvents.length = 0;
+// The player is behind the enemy and outside the authored cone. The gameplay
+// resolution event may still exist as a role/release signal, but presentation
+// must not turn a whiff into a physical-contact sound.
+played.length = 0;
 game._resolveEnemyAttack(enemy);
 assert.equal(
-  presentationEvents.filter((event) => event.type === 'combat:enemy-impact').length,
+  played.filter((event) => event.semanticId === 'physical-impact').length,
   0,
-  'melee whiff must not emit combat:enemy-impact before contact is known'
+  'melee whiff must not resolve physical-impact presentation audio'
 );
 
-// Move the same enemy into a valid cone and verify genuine contact emits once.
+// Move the same enemy into a valid cone and verify genuine contact resolves once.
 enemy.x = game.player.x + 36;
 enemy.y = game.player.y;
 enemy.windupLeft = 0.1;
@@ -64,12 +67,12 @@ enemy.telegraph = {
 };
 game.player.iframes = 0;
 game.player.deathTime = 0;
-presentationEvents.length = 0;
+played.length = 0;
 game._resolveEnemyAttack(enemy);
 assert.equal(
-  presentationEvents.filter((event) => event.type === 'combat:enemy-impact').length,
+  played.filter((event) => event.semanticId === 'physical-impact').length,
   1,
-  'confirmed melee contact must emit combat:enemy-impact exactly once'
+  'confirmed melee contact must resolve physical-impact presentation audio exactly once'
 );
 
 console.log('Ashen Covenant enemy contact presentation regression passed.');
