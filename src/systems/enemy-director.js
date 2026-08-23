@@ -46,7 +46,7 @@ export class EnemyDirector {
   resolveGroup({ groupId, factionId, enemies = [], player = {}, corpses = [], now = 0, covenant = {} } = {}) {
     const key = groupId ?? 'anonymous';
     const cached = this.cache.get(key);
-    if (cached && now - cached.at < this.minInterval && cached.count === enemies.length && cached.factionId === factionId) {
+    if (cached && now >= cached.at && now - cached.at < this.minInterval && cached.count === enemies.length && cached.factionId === factionId) {
       this.stats.cacheHits += 1;
       return cached.value;
     }
