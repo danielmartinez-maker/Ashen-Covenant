@@ -22,16 +22,28 @@ const game = new GameEngine(input, renderer, { sound: true, reducedVfx: false })
 const presentation = new GamePresentationSystem(game, { input, settings: game.settings, audio, strictEvents: true });
 assert.equal(game.start('warden', 'thornseer'), true);
 
+// Player attack-impact events identify the struck entity. Audio orchestration must
+// keep the player as source actor and use entityId as the contact target.
+const impactTarget = game._spawnEnemy('mireling', game.player.x + 48, game.player.y, { group: 'audio-impact-target', level: 1 });
+impactTarget.material = 'plate';
+const originalContextResolve = presentation.combatContextResolver.resolve.bind(presentation.combatContextResolver);
+let lastContextInputs = null;
+presentation.combatContextResolver.resolve = (currentGame, detail, options = {}) => {
+  lastContextInputs = { actor: options.actor, target: options.target, eventType: options.eventType };
+  return originalContextResolve(currentGame, detail, options);
+};
 presentation.eventBus.emit('combat:attack-impact', {
-  entityId: game.player.id,
+  entityId: impactTarget.id,
   critical: true,
   hitResult: { weight: 'heavy', guardBroken: true },
-  damageType: 'physical',
-  material: 'plate'
-}, { time: game.clock, source: 'test' });
+  damageType: 'physical'
+}, { time: game.clock, source: 'player-combat' });
 
+assert.equal(lastContextInputs.actor, game.player, 'player attack impact must retain the player as semantic audio actor');
+assert.equal(lastContextInputs.target, impactTarget, 'player attack impact entityId must resolve as the struck target');
 assert.equal(played.length, 1, 'mapped live presentation events must resolve exactly once');
 assert.equal(played[0].semanticId, 'physical-impact');
+assert.ok(played[0].layers.some((layer) => layer.assetId === 'impact-plate'), 'target material must drive the impact contact layer');
 assert.ok(played[0].layers.some((layer) => layer.assetId === 'guard-break'));
 assert.equal(presentation.eventBus.recent('audio:semantic-resolved', 1).length, 1);
 
