@@ -45,6 +45,23 @@ assert(game.endgame.routeContext.worldModifiers.corpseResurrection, 'Black Road 
 assert(game.endgame.routeContext.eclipseControls.extraRouteChoices >= 1, 'Black Road must freeze Eclipse controls at launch');
 assert.equal(game.endgame.bossCovenantVariant, 'grave', 'route context must force the authored boss affinity');
 assert(game.snapshot().activeOperation?.blackRoad, 'an active Black Road operation must serialize for reload without rerolling');
+
+// A restored checkpoint can only represent an authored contiguous prefix. A
+// corrupt save that claims a later room without its predecessors must resume at
+// the first missing room instead of advancing by the number of claimed IDs.
+const checkpointProbe = make();
+checkpointProbe.random = () => 0.1;
+assert(checkpointProbe.start('warden', 'thornseer'));
+const noncontiguousOperation = structuredClone(game.snapshot().activeOperation);
+noncontiguousOperation.completedStageIds = ['funeral-crypt'];
+assert(checkpointProbe._restoreActiveOperation(noncontiguousOperation), 'valid Black Road metadata with a corrupt completion ledger should still recover');
+assert.deepEqual(
+  checkpointProbe.endgame.completedStageIds,
+  [],
+  'Black Road restore must discard completed stages that are not a contiguous authored prefix'
+);
+assert.equal(checkpointProbe.endgame.activeStage?.id, 'funeral-gate', 'corrupt later-stage claims must resume at the first authored room');
+
 const frozenContext = JSON.parse(JSON.stringify(game.endgame.routeContext));
 game.save();
 const restored = make();
