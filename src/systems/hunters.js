@@ -12,6 +12,7 @@ export const HUNTER_ADAPTATIONS = Object.freeze([
 const rewardForFaction = Object.freeze({
   grave: 'black-lantern', blood: 'black-lantern', iron: 'unbowed-pact', void: 'wraith-gallows', storm: 'worldspine'
 });
+const HUNTER_REWARD_IDS = new Set(Object.values(rewardForFaction));
 const ADAPTATION_IDS = new Set(HUNTER_ADAPTATIONS.map((entry) => entry.id));
 const FACTION_IDS = new Set(Object.keys(rewardForFaction));
 let nextHunter = 1;
@@ -52,8 +53,9 @@ export class HunterSystem {
     hunter = record(hunter);
     const knowledge = record(hunter.knowledge);
     const factionId = FACTION_IDS.has(hunter.factionId) ? hunter.factionId : 'grave';
-    const targetRewardId = typeof hunter.targetRewardId === 'string' && hunter.targetRewardId.trim()
-      ? hunter.targetRewardId.slice(0, 96)
+    const requestedRewardId = typeof hunter.targetRewardId === 'string' ? hunter.targetRewardId.trim() : '';
+    const targetRewardId = HUNTER_REWARD_IDS.has(requestedRewardId)
+      ? requestedRewardId
       : rewardForFaction[factionId] ?? 'black-lantern';
     const storedId = text(hunter.id, null, 96);
     const id = storedId ? reserveHunterId(storedId) : `hunter-${nextHunter++}`;
