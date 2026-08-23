@@ -48,6 +48,9 @@ assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'death' })).sem
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'attack', knockdown: true })).semanticState, 'knockdown');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'attack', staggered: true, hitWeight: 'heavy' })).semanticState, 'hit-heavy');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'attack', execution: true })).semanticState, 'execution');
+assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'attack', execution: true, staggered: true, hitWeight: 'heavy' })).semanticState, 'execution', 'execution pose must outrank ordinary stagger reaction when both flags overlap');
+assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'death', execution: true, staggered: true, knockdown: true })).semanticState, 'death', 'death remains the absolute animation state');
+assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'attack', execution: true, knockdown: true })).semanticState, 'knockdown', 'knockdown must outrank execution while the actor is grounded');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'dodge' })).semanticState, 'dodge');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movementState: 'run', locomotionProgress: 0.64 })).semanticState, 'run');
 assert.equal(resolver.resolve(Object.freeze({ ...base, actionId: 'idle', movementState: 'run', locomotionProgress: 0.64, settings: Object.freeze({ reducedMotion: true }) })).semanticState, 'walk');
