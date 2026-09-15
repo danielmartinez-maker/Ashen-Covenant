@@ -4,6 +4,7 @@ import { getHybrid } from '../data/classes.js';
 import { resolveCovenantPresentationIdentity } from './covenant-identity.js';
 
 const FACING_STEP = Math.PI / 4;
+const COVENANT_AFFINITIES = Object.freeze(['flame', 'grave', 'blood', 'light', 'storm', 'void']);
 const freezeRecord = (value) => Object.freeze({ ...(value ?? {}) });
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -30,6 +31,21 @@ const nonPlayerCovenantFor = (actor, detail) => {
   const bossAffinity = actor?.bossRuntime?.affinity;
   return bossAffinity && bossAffinity !== 'base' ? { primary: bossAffinity, stage: 0 } : {};
 };
+const covenantRevisionFor = (state) => {
+  if (!isRecord(state)) return 'none';
+  const affinities = isRecord(state.affinities) ? state.affinities : {};
+  return `${finite(state.stage, 0)}:${finite(state.instability, 0)}:${COVENANT_AFFINITIES.map((id) => finite(affinities[id], 0)).join(',')}`;
+};
+const SETTINGS_PRESETS = Object.freeze(Array.from({ length: 8 }, (_, bits) => Object.freeze({
+  reducedMotion: Boolean(bits & 4),
+  reducedFlashing: Boolean(bits & 2),
+  reducedVfx: Boolean(bits & 1)
+})));
+const settingsContextFor = (settings = {}) => SETTINGS_PRESETS[
+  (settings.reducedMotion === true ? 4 : 0)
+  | (settings.reducedFlashing === true ? 2 : 0)
+  | (settings.reducedVfx === true ? 1 : 0)
+];
 
 export const neutralPresentationCombatContext = () => Object.freeze({
   actorId: null, actorKind: 'unknown', enemyRole: null, bossId: null, hunterId: null,
@@ -43,11 +59,30 @@ export const neutralPresentationCombatContext = () => Object.freeze({
   covenantIdentity: resolveCovenantPresentationIdentity({}, {}),
   hitWeight: 'light', damageFamily: 'physical', contactMaterial: 'flesh', guarded: false,
   guardBroken: false, poiseBroken: false, staggered: false, knockdown: false, execution: false,
-  critical: false, settings: freezeRecord({ reducedMotion: false, reducedFlashing: false, reducedVfx: false }),
-  eventType: null
+  critical: false, settings: SETTINGS_PRESETS[0], eventType: null
 });
 
 export class PresentationCombatContextResolver {
+  constructor() {
+    this.playerCovenantCache = { state: null, revision: '', overview: null };
+    this.hybridCache = new Map();
+  }
+  _playerCovenant(game, player) {
+    const state = player?.covenant ?? null;
+    const revision = covenantRevisionFor(state);
+    if (this.playerCovenantCache.state === state && this.playerCovenantCache.revision === revision && this.playerCovenantCache.overview) {
+      return this.playerCovenantCache.overview;
+    }
+    const overview = game.getCovenantOverview?.() ?? {};
+    this.playerCovenantCache = { state, revision, overview };
+    return overview;
+  }
+  _hybrid(primaryClass, secondaryClass) {
+    if (!primaryClass || !secondaryClass) return null;
+    const key = `${primaryClass}:${secondaryClass}`;
+    if (!this.hybridCache.has(key)) this.hybridCache.set(key, getHybrid(primaryClass, secondaryClass));
+    return this.hybridCache.get(key) ?? null;
+  }
   resolve(game, detail = {}, { actor = game?.player, eventType = null, target = null } = {}) {
     try {
       if (!game || !actor) return neutralPresentationCombatContext();
@@ -57,8 +92,10 @@ export class PresentationCombatContextResolver {
       const profile = action?.profile ?? {};
       const duration = Math.max(0.0001, finite(profile.duration, finite(actor?.animation?.duration, 1)));
       const elapsed = finite(action?.elapsed, duration - finite(actor?.animation?.time, duration));
-      const covenant = playerActor ? game.getCovenantOverview?.() ?? {} : nonPlayerCovenantFor(actor, detail);
-      const covenantIdentity = resolveCovenantPresentationIdentity(covenant, { abilityId: detail.abilityId, mutationId: detail.mutationId });
+      const covenant = playerActor ? this._playerCovenant(game, player) : nonPlayerCovenantFor(actor, detail);
+      const covenantIdentity = playerActor && !detail.abilityId && !detail.mutationId && actor.covenantPresentation
+        ? actor.covenantPresentation
+        : resolveCovenantPresentationIdentity(covenant, { abilityId: detail.abilityId, mutationId: detail.mutationId });
       const equipmentRecord = isRecord(actor.equipment) ? actor.equipment : {};
       const equipment = Object.values(equipmentRecord).filter((item) => isRecord(item));
       const visibleEquipment = equipment.map((item) => Object.freeze({
@@ -77,7 +114,7 @@ export class PresentationCombatContextResolver {
       const zone = zoneAt(actor.x ?? player?.x ?? 0, actor.y ?? player?.y ?? 0);
       const primaryClass = typeof actor.primary === 'string' ? actor.primary : null;
       const secondaryClass = typeof actor.secondary === 'string' ? actor.secondary : null;
-      const hybrid = primaryClass && secondaryClass ? getHybrid(primaryClass, secondaryClass) : null;
+      const hybrid = this._hybrid(primaryClass, secondaryClass);
       const context = {
         actorId: actor.id ?? null,
         actorKind: playerActor ? 'player' : actor.boss ? 'boss' : actor.hunterId ? 'hunter' : 'enemy',
@@ -100,8 +137,7 @@ export class PresentationCombatContextResolver {
         contactMaterial: detail.contactMaterial ?? detail.material ?? target?.material ?? 'flesh', guarded: Boolean(hit.guarded ?? detail.guarded),
         guardBroken: Boolean(hit.guardBroken ?? detail.guardBroken), poiseBroken: Boolean(hit.poiseBroken ?? detail.poiseBroken), staggered: Boolean(hit.staggered ?? detail.staggered),
         knockdown: Boolean(hit.knockdown ?? detail.knockdown), execution: Boolean(detail.execution || detail.source === 'execution'), critical: Boolean(detail.critical),
-        settings: freezeRecord({ reducedMotion: game.settings?.reducedMotion === true, reducedFlashing: game.settings?.reducedFlashing === true, reducedVfx: game.settings?.reducedVfx === true }),
-        eventType
+        settings: settingsContextFor(game.settings), eventType
       };
       return Object.freeze(context);
     } catch (error) {
