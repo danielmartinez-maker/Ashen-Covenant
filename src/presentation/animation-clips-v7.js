@@ -32,14 +32,14 @@ const sampleWindow = (window, progress) => {
 const locomotionSemantic = new Set(['idle', 'walk', 'run', 'turn', 'guard']);
 
 export class AnimationClipResolver {
-  resolve(context = {}) {
+  resolve(context = {}, locomotionProgress = undefined) {
     try {
       const semanticState = semanticFor(context);
       const requestedClass = context.primaryClass ?? 'warden';
       const classId = PLAYER_ANIMATION_CLIPS[`${requestedClass}:${semanticState}`] ? requestedClass : 'warden';
       const clip = clipById(`${classId}:${semanticState}`);
       const progress = clamp(Number(locomotionSemantic.has(semanticState)
-        ? context.locomotionProgress ?? context.movementProgress ?? context.movementIntensity ?? 0
+        ? locomotionProgress ?? context.locomotionProgress ?? context.movementProgress ?? context.movementIntensity ?? 0
         : context.actionProgress ?? 0) || 0, 0, 1);
       const facingLane = Math.max(0, Math.min(7, Math.floor(Number(context.facingLane) || 0)));
       return Object.freeze({
