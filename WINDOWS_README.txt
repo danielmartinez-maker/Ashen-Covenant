@@ -1,4 +1,4 @@
-ASHEN COVENANT: THE BLACK ROAD 6.0.0
+ASHEN COVENANT: THE BLACK ROAD 7.0.0
 
 PLAY
 1. Extract the complete ZIP to a normal folder.
@@ -27,9 +27,14 @@ THE BLACK ROAD
 - Ritual vessels protect their formation until you destroy all three.
 - Midpoint route choices alter Heat, rewards, boons, and banes.
 - Boss arenas shrink and change through multiple combat phases.
-- Animated enemy motion sheets, fixed-facing 2.5D heroes, painted terrain,
-  entrances, props, and NPCs replace the old proxy geometry. Actor art has no
-  geometric fallback.
+- Six primary classes use authored v7 body-animation sheets with Covenant-aware
+  combat presentation and fixed-facing 2.5D motion.
+- Equipped item families, Unique/Mythic signatures, Masterwork, corruption, and
+  Covenant identity remain visibly legible through the equipment layer system.
+- Semantic combat audio layers weapon, material, guard/poise, execution,
+  Hunter, boss, Covenant, and ambience cues through the presentation director.
+- Animated enemy motion sheets, painted terrain, entrances, props, and NPCs
+  replace the old proxy geometry. Actor art has no geometric fallback.
 - Players and enemies use grounded elevation and gravity. Character bodies
   step through authored facing stances rather than freely spinning 360 degrees.
 - Every basic attack, spell, Companion Technique, hybrid action, ultimate, and
@@ -40,4 +45,4 @@ THE BLACK ROAD
 - Prior covenants migrate automatically to save version 19 with Covenant, Hunter,
   world-state, Sanctuary, and Black Road records initialized safely.
 
-The full release report and test evidence are in docs/ in the source archive.
+The full v7.0.0 release report and test evidence are in docs/ in the source archive.
