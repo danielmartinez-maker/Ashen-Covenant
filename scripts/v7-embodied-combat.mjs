@@ -216,7 +216,11 @@ for (let desiredStage = 1; desiredStage <= 5; desiredStage += 1) {
   const target = game._spawnEnemy('mireling', game.player.x + 35, game.player.y, { group: 'v7-execution' });
   target.knockdown = 1;
   assert.equal(game._executeEnemy(target), true, 'knocked-down enemy must remain execution-eligible');
-  assert.equal(target.dead, true, 'execution must resolve authoritative gameplay state');
+  for (let step = 0; step < 20 && !target.dead; step += 1) {
+    presentation.updateGameplay(0.1);
+    presentation.update(1 / 60);
+  }
+  assert.equal(target.dead, true, 'execution must resolve authoritative gameplay state after its authored presentation window');
   game.presentation.emit('combat:attack-start', { action: 'execution', execution: true }, { source: 'v7-integrated-test' });
   game.presentation.emit('combat:attack-impact', {
     entityId: target.id,
