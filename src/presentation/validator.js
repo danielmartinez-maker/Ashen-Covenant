@@ -4,6 +4,11 @@ import {
 } from '../data/presentation.js';
 import { ANIMATION_SEMANTIC_STATES, HERO_MOTION_ASSETS, PLAYER_ANIMATION_CLIPS } from '../data/animation-v7.js';
 import { AUDIO_ASSETS_V7, AUDIO_CATEGORY_BUDGETS, AUDIO_REQUIRED_EVENT_FAMILIES, AUDIO_SEMANTIC_DEFINITIONS } from '../data/audio-v7.js';
+import {
+  EQUIPMENT_LAYER_ASSETS, EQUIPMENT_SLOT_FAMILIES, RARITY_MATERIALS, UNIQUE_VISUAL_SIGNATURES,
+  equipmentBaseFamily, equipmentFamilyCell
+} from '../data/equipment-appearance-v7.js';
+import { ITEM_BASES, UNIQUES, UNIQUE_VISUAL_SIGNATURE_IDS } from '../data/items.js';
 
 const issue = (severity, code, message, target = null) => ({ severity, code, message, target });
 
@@ -37,6 +42,60 @@ export const validateV7AnimationData = () => {
   };
 };
 
+export const validateV7EquipmentAppearanceData = () => {
+  const issues = [];
+  for (const [key, asset] of Object.entries(EQUIPMENT_LAYER_ASSETS)) {
+    if (!asset?.required || !asset.id || !asset.src?.startsWith('/assets/equipment/v7/') || !asset.src.endsWith('.svg')) {
+      issues.push(issue('error', 'V7_EQUIPMENT_ASSET', `${key} has an invalid required v7 equipment asset.`, key));
+    }
+    if (!Number.isInteger(asset?.columns) || asset.columns <= 0 || !Number.isInteger(asset?.rows) || asset.rows <= 0) {
+      issues.push(issue('error', 'V7_EQUIPMENT_GRID', `${key} has invalid atlas dimensions.`, key));
+    }
+  }
+
+  const layerCapacity = EQUIPMENT_LAYER_ASSETS.layers.columns * EQUIPMENT_LAYER_ASSETS.layers.rows;
+  for (const base of ITEM_BASES) {
+    const families = EQUIPMENT_SLOT_FAMILIES[base.slot];
+    if (!families) continue;
+    const family = equipmentBaseFamily(base.id, base.slot);
+    const cell = equipmentFamilyCell(base.id, base.slot);
+    if (!families.includes(family)) issues.push(issue('error', 'V7_EQUIPMENT_FAMILY', `${base.id} resolves orphan family ${family}.`, base.id));
+    if (!Number.isInteger(cell) || cell < 0 || cell >= layerCapacity) issues.push(issue('error', 'V7_EQUIPMENT_CELL', `${base.id} resolves invalid equipment cell ${cell}.`, base.id));
+  }
+
+  const signatureCapacity = EQUIPMENT_LAYER_ASSETS.signatures.columns * EQUIPMENT_LAYER_ASSETS.signatures.rows;
+  const uniqueIds = new Set(UNIQUES.map((unique) => unique.id));
+  for (const unique of UNIQUES) {
+    const signature = UNIQUE_VISUAL_SIGNATURES[unique.id];
+    const expectedId = UNIQUE_VISUAL_SIGNATURE_IDS[unique.id];
+    if (!signature) {
+      issues.push(issue('error', 'V7_EQUIPMENT_SIGNATURE', `${unique.id} has no visual signature.`, unique.id));
+      continue;
+    }
+    if (signature.id !== expectedId || signature.id !== `unique:${unique.id}`) issues.push(issue('error', 'V7_EQUIPMENT_SIGNATURE_ID', `${unique.id} has mismatched signature id ${signature.id}.`, unique.id));
+    if (signature.slot !== unique.slot) issues.push(issue('error', 'V7_EQUIPMENT_SIGNATURE_SLOT', `${unique.id} signature is bound to ${signature.slot}, expected ${unique.slot}.`, unique.id));
+    if (!Number.isInteger(signature.cell) || signature.cell < 0 || signature.cell >= signatureCapacity) issues.push(issue('error', 'V7_EQUIPMENT_SIGNATURE_CELL', `${unique.id} has invalid signature cell ${signature.cell}.`, unique.id));
+    if (signature.preserveWhenReduced !== true) issues.push(issue('error', 'V7_EQUIPMENT_REDUCED_IDENTITY', `${unique.id} may lose identity under reduced VFX.`, unique.id));
+  }
+  for (const uniqueId of Object.keys(UNIQUE_VISUAL_SIGNATURES)) {
+    if (!uniqueIds.has(uniqueId)) issues.push(issue('error', 'V7_EQUIPMENT_ORPHAN_SIGNATURE', `${uniqueId} is an orphan visual signature.`, uniqueId));
+  }
+  for (const rarity of ['common', 'magic', 'rare', 'relic', 'unique', 'mythic']) {
+    if (!RARITY_MATERIALS[rarity]) issues.push(issue('error', 'V7_EQUIPMENT_RARITY', `${rarity} has no appearance material.`, rarity));
+  }
+
+  return {
+    valid: !issues.some((entry) => entry.severity === 'error'),
+    issues,
+    summary: {
+      assets: Object.keys(EQUIPMENT_LAYER_ASSETS).length,
+      bases: ITEM_BASES.length,
+      signatures: Object.keys(UNIQUE_VISUAL_SIGNATURES).length,
+      rarities: Object.keys(RARITY_MATERIALS).length
+    }
+  };
+};
+
 export const validateV7AudioData = () => {
   const issues = [];
   for (const id of AUDIO_REQUIRED_EVENT_FAMILIES) {
@@ -59,6 +118,18 @@ export const validateV7AudioData = () => {
     valid: !issues.some((entry) => entry.severity === 'error'),
     issues,
     summary: { semanticEvents: AUDIO_REQUIRED_EVENT_FAMILIES.length, assets: Object.keys(AUDIO_ASSETS_V7).length }
+  };
+};
+
+export const validateV7PresentationData = () => {
+  const animation = validateV7AnimationData();
+  const equipment = validateV7EquipmentAppearanceData();
+  const audio = validateV7AudioData();
+  const issues = [...animation.issues, ...equipment.issues, ...audio.issues];
+  return {
+    valid: !issues.some((entry) => entry.severity === 'error'),
+    issues,
+    summary: { animation: animation.summary, equipment: equipment.summary, audio: audio.summary }
   };
 };
 
