@@ -46,7 +46,10 @@ export class PresentationContextResolver {
   update(game, delta) {
     const dt = clamp(Number(delta) || 0, 0, 0.1);
     this.sampleTimer -= dt;
-    if (this.sampleTimer <= 0) {
+    const endgame = game?.endgame;
+    const activityId = typeof endgame?.activity === 'string' ? endgame.activity : endgame?.activity?.id ?? endgame?.delveId ?? null;
+    const activityChanged = activityId !== (this.context.currentEndgameActivity ?? null);
+    if (this.sampleTimer <= 0 || activityChanged) {
       this.sampleTimer = this.sampleInterval;
       this._sample(game);
     }
