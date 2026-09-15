@@ -106,6 +106,7 @@ export class PresentationCombatContextResolver {
     this.playerCovenantCache = { state: null, snapshot: null, overview: null };
     this.equipmentCache = { record: null, snapshots: null, summary: null, empty: false };
     this.zoneCache = { actor: null, x: NaN, y: NaN, zone: null };
+    this.frameCache = null;
     this.hybridCache = new Map();
   }
   _playerCovenant(game, player) {
@@ -201,31 +202,61 @@ export class PresentationCombatContextResolver {
       const primaryClass = typeof actor.primary === 'string' ? actor.primary : null;
       const secondaryClass = typeof actor.secondary === 'string' ? actor.secondary : null;
       const hybrid = this._hybrid(primaryClass, secondaryClass);
+      const actionId = detail.action ?? profile.action ?? actor.animation?.type ?? 'idle';
+      const profileId = detail.profileId ?? profile.id ?? actor.animation?.profileId ?? null;
+      const comboIndex = Math.max(0, Math.floor(finite(detail.comboIndex, profile.comboIndex ?? 0)));
+      const phase = detail.phase ?? action?.phase ?? 'idle';
+      const actionProgress = clamp(finite(detail.actionProgress, elapsed / duration), 0, 1);
+      const facingLane = laneFor(actor.presentation?.visualFacing ?? actor.presentation?.locomotion?.visualFacing ?? actor.facing ?? 0);
+      const movementState = actor.presentation?.locomotion?.state ?? actor.state ?? 'idle';
+      const movementIntensity = clamp(finite(actor.presentation?.locomotion?.speedRatio, Math.hypot(actor.moveX ?? 0, actor.moveY ?? 0) / 250), 0, 1.5);
+      const elevation = Math.max(0, finite(actor.elevation, 0));
+      const grounded = actor.grounded !== false;
+      const surface = actor.surface ?? 'stone';
+      const weaponFamily = actor.presentation?.profile?.weapon ?? null;
+      const corruptionLevel = Math.max(equipment.corruptionLevel, finite(detail.corruptionLevel, 0));
+      const masterworkRank = Math.max(equipment.masterworkRank, finite(detail.masterworkRank, 0));
+      const covenantPrimary = covenant.primary ?? 'unbound';
+      const covenantSecondary = covenant.secondary ?? null;
+      const covenantStage = finite(covenant.stage, 0);
+      const covenantInstability = finite(covenant.instability, 0);
+      const covenantRupture = Boolean(covenant.ruptureActive);
+      const settings = settingsContextFor(game.settings);
+      if (playerActor && eventType === 'frame') {
+        const cached = this.frameCache;
+        if (cached
+          && cached.actorId === (actor.id ?? null)
+          && cached.primaryClass === primaryClass && cached.secondaryClass === secondaryClass && cached.hybridId === (hybrid?.id ?? null)
+          && cached.actionId === actionId && cached.profileId === profileId && cached.comboIndex === comboIndex && cached.phase === phase && cached.actionProgress === actionProgress
+          && cached.facingLane === facingLane && cached.movementState === movementState && cached.movementIntensity === movementIntensity
+          && cached.elevation === elevation && cached.grounded === grounded && cached.surface === surface && cached.region === zone.id
+          && cached.weaponFamily === weaponFamily && cached.offhandFamily === equipment.offhandFamily
+          && cached.visibleEquipment === equipment.visibleEquipment && cached.visualSignatureIds === equipment.visualSignatureIds
+          && cached.corruptionLevel === corruptionLevel && cached.masterworkRank === masterworkRank
+          && cached.covenantPrimary === covenantPrimary && cached.covenantSecondary === covenantSecondary
+          && cached.covenantStage === covenantStage && cached.covenantInstability === covenantInstability && cached.covenantRupture === covenantRupture
+          && cached.covenantIdentity === covenantIdentity && cached.settings === settings) return cached;
+      }
       const context = {
         actorId: actor.id ?? null,
         actorKind: playerActor ? 'player' : actor.boss ? 'boss' : actor.hunterId ? 'hunter' : 'enemy',
         enemyRole: actor.role ?? null, bossId: actor.boss ? actor.templateId ?? actor.id : null, hunterId: actor.hunterId ?? null,
         primaryClass, secondaryClass, hybridId: hybrid?.id ?? null,
-        actionId: detail.action ?? profile.action ?? actor.animation?.type ?? 'idle', profileId: detail.profileId ?? profile.id ?? actor.animation?.profileId ?? null,
-        comboIndex: Math.max(0, Math.floor(finite(detail.comboIndex, profile.comboIndex ?? 0))), phase: detail.phase ?? action?.phase ?? 'idle',
-        actionProgress: clamp(finite(detail.actionProgress, elapsed / duration), 0, 1), eventId: detail.eventId ?? null,
-        facingLane: laneFor(actor.presentation?.visualFacing ?? actor.presentation?.locomotion?.visualFacing ?? actor.facing ?? 0), movementState: actor.presentation?.locomotion?.state ?? actor.state ?? 'idle',
-        movementIntensity: clamp(finite(actor.presentation?.locomotion?.speedRatio, Math.hypot(actor.moveX ?? 0, actor.moveY ?? 0) / 250), 0, 1.5),
-        elevation: Math.max(0, finite(actor.elevation, 0)), grounded: actor.grounded !== false, surface: actor.surface ?? 'stone', region: zone.id,
-        weaponFamily: actor.presentation?.profile?.weapon ?? null, offhandFamily: equipment.offhandFamily,
-        visibleEquipment: equipment.visibleEquipment, rarity: detail.rarity ?? 'common',
-        corruptionLevel: Math.max(equipment.corruptionLevel, finite(detail.corruptionLevel, 0)),
-        masterworkRank: Math.max(equipment.masterworkRank, finite(detail.masterworkRank, 0)),
+        actionId, profileId, comboIndex, phase, actionProgress, eventId: detail.eventId ?? null,
+        facingLane, movementState, movementIntensity, elevation, grounded, surface, region: zone.id,
+        weaponFamily, offhandFamily: equipment.offhandFamily,
+        visibleEquipment: equipment.visibleEquipment, rarity: detail.rarity ?? 'common', corruptionLevel, masterworkRank,
         visualSignatureIds: equipment.visualSignatureIds,
-        covenantPrimary: covenant.primary ?? 'unbound', covenantSecondary: covenant.secondary ?? null, covenantStage: finite(covenant.stage, 0),
-        covenantInstability: finite(covenant.instability, 0), covenantRupture: Boolean(covenant.ruptureActive), covenantIdentity,
+        covenantPrimary, covenantSecondary, covenantStage, covenantInstability, covenantRupture, covenantIdentity,
         hitWeight: detail.hitWeight ?? hit.weight ?? (detail.critical ? 'heavy' : 'light'), damageFamily: detail.damageFamily ?? detail.damageType ?? 'physical',
         contactMaterial: detail.contactMaterial ?? detail.material ?? target?.material ?? 'flesh', guarded: Boolean(hit.guarded ?? detail.guarded),
         guardBroken: Boolean(hit.guardBroken ?? detail.guardBroken), poiseBroken: Boolean(hit.poiseBroken ?? detail.poiseBroken), staggered: Boolean(hit.staggered ?? detail.staggered),
         knockdown: Boolean(hit.knockdown ?? detail.knockdown), execution: Boolean(detail.execution || detail.source === 'execution'), critical: Boolean(detail.critical),
-        settings: settingsContextFor(game.settings), eventType
+        settings, eventType
       };
-      return Object.freeze(context);
+      const frozen = Object.freeze(context);
+      if (playerActor && eventType === 'frame') this.frameCache = frozen;
+      return frozen;
     } catch (error) {
       game?.presentation?.eventBus?.emit?.('presentation:error', { subsystem: 'combat-context-v7', message: error?.message ?? String(error) }, { time: game?.clock ?? 0, source: 'combat-context-v7', priority: 100 });
       return neutralPresentationCombatContext();
