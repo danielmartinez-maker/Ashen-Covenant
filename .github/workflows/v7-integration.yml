@@ -43,3 +43,5 @@ jobs:
         run: npm run test:v7:audio
       - name: Electron file protocol certification
         run: npm run test:file-protocol
+      - name: V7 release contract
+        run: node scripts/release-contract-v7.mjs
