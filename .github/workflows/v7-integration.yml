@@ -1,0 +1,47 @@
+name: V7 Integration
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: v7-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  embodied-combat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      npm_config_engine_strict: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - name: Integrated embodied combat regression
+        run: node scripts/v7-embodied-combat.mjs
+      - name: V7 architecture compatibility
+        run: node scripts/v7-architecture-compatibility.mjs
+      - name: V6 migration compatibility
+        run: node scripts/migration-matrix-v6.mjs
+      - name: V6 architecture boundaries
+        run: node scripts/architecture-boundaries-v6.mjs
+      - name: V7 presentation overhead budget
+        run: node --expose-gc scripts/performance-v7.mjs
+      - name: Presentation absolute performance budget
+        run: node --expose-gc scripts/presentation-performance.mjs
+      - name: V6 performance compatibility
+        run: node --expose-gc scripts/performance-v6.mjs
+      - name: V7 audio certification
+        run: npm run test:v7:audio
+      - name: Electron file protocol certification
+        run: npm run test:file-protocol
+      - name: V7 release contract
+        run: node scripts/release-contract-v7.mjs

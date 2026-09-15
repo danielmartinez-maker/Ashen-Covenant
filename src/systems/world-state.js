@@ -3,6 +3,18 @@ import { ZONES } from '../data/world.js';
 const clone = (value) => value == null ? value : JSON.parse(JSON.stringify(value));
 const safeArray = (value) => Array.isArray(value) ? value : [];
 const safeRecord = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const bounded = (value, fallback, min, max) => Math.max(min, Math.min(max, finite(value, fallback)));
+const integer = (value, fallback, min, max) => Math.floor(bounded(value, fallback, min, max));
+const safeText = (value, fallback = null, max = 120) => typeof value === 'string' && value.trim() ? value.slice(0, max) : fallback;
+const uniqueById = (values) => {
+  const seen = new Set();
+  return values.filter((entry) => {
+    if (!entry?.id || seen.has(entry.id)) return false;
+    seen.add(entry.id);
+    return true;
+  });
+};
 
 export const PERSISTENT_WORLD_EVENTS = Object.freeze({
   'gravewake-rising': Object.freeze({
@@ -39,40 +51,87 @@ const defaultModifiers = () => ({
   failedCount: 0
 });
 
+const normalizeModifiers = (source = {}, defaults = {}) => {
+  const raw = { ...safeRecord(defaults), ...safeRecord(source) };
+  return {
+    enemyDensity: bounded(raw.enemyDensity, 1, 0.1, 5),
+    hunterPressure: bounded(raw.hunterPressure, 0, 0, 5),
+    corpseResurrection: raw.corpseResurrection === true,
+    weather: safeText(raw.weather),
+    lighting: safeText(raw.lighting),
+    lootBias: [...new Set(safeArray(raw.lootBias).filter((id) => typeof id === 'string' && id.trim()).map((id) => id.slice(0, 48)))].slice(0, 12),
+    bleedPower: bounded(raw.bleedPower, 0, 0, 5),
+    eliteRate: bounded(raw.eliteRate, 0, 0, 1),
+    bossModifier: safeText(raw.bossModifier, null, 80)
+  };
+};
+
+const normalizeEcho = (entry) => {
+  const raw = safeRecord(entry);
+  if (!raw.typeId && !raw.outcome) return null;
+  return {
+    typeId: safeText(raw.typeId, 'unknown', 80),
+    modifiers: normalizeModifiers(raw.modifiers),
+    outcome: safeText(raw.outcome, 'unknown', 80),
+    resolvedAt: Math.max(0, finite(raw.resolvedAt, 0))
+  };
+};
+
 const mergeModifiers = (target, source = {}) => {
-  target.enemyDensity *= Number(source.enemyDensity) > 0 ? Number(source.enemyDensity) : 1;
-  target.hunterPressure += Number(source.hunterPressure) || 0;
-  target.corpseResurrection ||= source.corpseResurrection === true;
-  target.weather = source.weather ?? target.weather;
-  target.lighting = source.lighting ?? target.lighting;
-  target.bleedPower += Number(source.bleedPower) || 0;
-  target.eliteRate += Number(source.eliteRate) || 0;
-  target.bossModifier = source.bossModifier ?? target.bossModifier;
-  for (const id of safeArray(source.lootBias)) if (!target.lootBias.includes(id)) target.lootBias.push(id);
+  const normalized = normalizeModifiers(source);
+  target.enemyDensity *= normalized.enemyDensity;
+  target.hunterPressure += normalized.hunterPressure;
+  target.corpseResurrection ||= normalized.corpseResurrection;
+  target.weather = normalized.weather ?? target.weather;
+  target.lighting = normalized.lighting ?? target.lighting;
+  target.bleedPower += normalized.bleedPower;
+  target.eliteRate += normalized.eliteRate;
+  target.bossModifier = normalized.bossModifier ?? target.bossModifier;
+  for (const id of normalized.lootBias) if (!target.lootBias.includes(id)) target.lootBias.push(id);
   return target;
 };
 
 export class WorldStateManager {
   normalize(value) {
     const input = safeRecord(value);
+    const savedRegions = safeRecord(input.regions);
     const regions = {};
     for (const zone of ZONES.filter((entry) => !entry.safe)) {
-      const saved = safeRecord(safeRecord(input.regions)[zone.id]);
+      const saved = safeRecord(savedRegions[zone.id]);
       regions[zone.id] = {
-        ...baseRegion(zone.id),
-        ...clone(saved),
-        echoes: safeArray(saved.echoes).map((entry) => clone(entry)).slice(-12)
+        zoneId: zone.id,
+        pressure: bounded(saved.pressure, 0, 0, 5),
+        resolvedCount: integer(saved.resolvedCount, 0, 0, 1_000_000),
+        failedCount: integer(saved.failedCount, 0, 0, 1_000_000),
+        echoes: safeArray(saved.echoes).map(normalizeEcho).filter(Boolean).slice(-12),
+        lastOutcome: safeText(saved.lastOutcome, null, 80),
+        lastEventId: safeText(saved.lastEventId, null, 120)
       };
     }
-    const activeEvents = safeArray(input.activeEvents).map((entry) => this.#normalizeEvent(entry)).filter(Boolean);
-    const resolvedEvents = safeArray(input.resolvedEvents).map((entry) => clone(entry)).slice(-40);
-    const procession = input.procession ? {
-      eventId: String(input.procession.eventId ?? ''),
-      zoneId: PROCESSION_ROUTE.includes(input.procession.zoneId) ? input.procession.zoneId : PROCESSION_ROUTE[0],
-      routeIndex: Math.max(0, Math.min(PROCESSION_ROUTE.length - 1, Math.floor(Number(input.procession.routeIndex) || 0))),
-      travel: Math.max(0, Number(input.procession.travel) || 0)
-    } : null;
-    return { regions, activeEvents, resolvedEvents, procession, tick: Math.max(0, Number(input.tick) || 0) };
+    const normalizedResolvedEvents = uniqueById(safeArray(input.resolvedEvents).map((entry) => this.#normalizeResolvedEvent(entry)).filter(Boolean));
+    const terminalEventIds = new Set(normalizedResolvedEvents.map((event) => event.id));
+    const activeEvents = uniqueById(safeArray(input.activeEvents).map((entry) => this.#normalizeEvent(entry)).filter(Boolean))
+      .filter((event) => !terminalEventIds.has(event.id))
+      .slice(0, 16);
+    const resolvedEvents = normalizedResolvedEvents.slice(-40);
+    const processionRaw = safeRecord(input.procession);
+    let procession = null;
+    if (input.procession && Object.keys(processionRaw).length) {
+      const eventId = safeText(processionRaw.eventId, '', 120);
+      const linkedEvent = activeEvents.find((event) => event.id === eventId && event.typeId === 'black-procession');
+      if (linkedEvent) {
+        const zoneId = PROCESSION_ROUTE.includes(linkedEvent.zoneId) ? linkedEvent.zoneId : PROCESSION_ROUTE[0];
+        const routeIndex = Math.max(0, PROCESSION_ROUTE.indexOf(zoneId));
+        linkedEvent.zoneId = zoneId;
+        procession = {
+          eventId,
+          zoneId,
+          routeIndex,
+          travel: bounded(processionRaw.travel, 0, 0, 30)
+        };
+      }
+    }
+    return { regions, activeEvents, resolvedEvents, procession, tick: Math.max(0, finite(input.tick, 0)) };
   }
 
   #normalizeEvent(entry) {
@@ -81,19 +140,34 @@ export class WorldStateManager {
     if (!definition) return null;
     const zoneId = ZONES.some((zone) => zone.id === source.zoneId && !zone.safe) ? source.zoneId : definition.zoneId;
     return {
-      id: String(source.id || `world-${definition.id}-${Math.floor(Number(source.startedAt) || 0)}`),
+      id: safeText(source.id, `world-${definition.id}-${Math.floor(finite(source.startedAt, 0))}`, 120),
       typeId: definition.id,
       name: definition.name,
       factionId: definition.factionId,
       zoneId,
-      startedAt: Math.max(0, Number(source.startedAt) || 0),
-      elapsed: Math.max(0, Number(source.elapsed) || 0),
-      duration: Math.max(30, Number(source.duration) || definition.duration),
-      progress: Math.max(0, Number(source.progress) || 0),
-      target: Math.max(1, Math.floor(Number(source.target) || 1)),
-      modifiers: { ...clone(definition.modifiers), ...clone(safeRecord(source.modifiers)) },
+      startedAt: Math.max(0, finite(source.startedAt, 0)),
+      elapsed: Math.max(0, finite(source.elapsed, 0)),
+      duration: bounded(source.duration, definition.duration, 30, 86_400),
+      progress: Math.max(0, finite(source.progress, 0)),
+      target: integer(source.target, 1, 1, 1_000_000),
+      modifiers: normalizeModifiers(source.modifiers, definition.modifiers),
       physicalSpawned: source.physicalSpawned === true,
       resolved: false
+    };
+  }
+
+  #normalizeResolvedEvent(entry) {
+    const source = safeRecord(entry);
+    const definition = PERSISTENT_WORLD_EVENTS[source.typeId];
+    if (!definition) return null;
+    const activeShape = this.#normalizeEvent(source);
+    if (!activeShape) return null;
+    return {
+      ...activeShape,
+      resolved: source.resolved === true && source.failed !== true,
+      failed: source.failed === true,
+      outcome: safeText(source.outcome, source.failed === true ? 'failed' : 'cleared', 80),
+      resolvedAt: Math.max(0, finite(source.resolvedAt, activeShape.startedAt))
     };
   }
 
@@ -105,9 +179,22 @@ export class WorldStateManager {
     const zoneId = ZONES.some((zone) => zone.id === context.zoneId && !zone.safe) ? context.zoneId : definition.zoneId;
     const duplicate = state.activeEvents.find((event) => event.typeId === typeId && event.zoneId === zoneId);
     if (duplicate) return duplicate;
-    const sequence = state.activeEvents.length + state.resolvedEvents.length + 1;
+
+    const retainedEvents = [...state.activeEvents, ...state.resolvedEvents];
+    const retainedIds = new Set(retainedEvents.map((event) => event.id));
+    const highestRetainedSequence = retainedEvents.reduce((highest, event) => {
+      const match = typeof event.id === 'string' ? event.id.match(/-(\d+)$/) : null;
+      return match ? Math.max(highest, integer(match[1], 0, 0, Number.MAX_SAFE_INTEGER - 1)) : highest;
+    }, 0);
+    let sequence = Math.max(state.activeEvents.length + state.resolvedEvents.length + 1, highestRetainedSequence + 1);
+    let eventId = `world-${typeId}-${Math.floor(state.tick)}-${sequence}`;
+    while (retainedIds.has(eventId) && sequence < Number.MAX_SAFE_INTEGER) {
+      sequence += 1;
+      eventId = `world-${typeId}-${Math.floor(state.tick)}-${sequence}`;
+    }
+
     const event = this.#normalizeEvent({
-      id: `world-${typeId}-${Math.floor(state.tick)}-${sequence}`,
+      id: eventId,
       typeId,
       zoneId,
       startedAt: state.tick,
@@ -117,7 +204,7 @@ export class WorldStateManager {
     });
     state.activeEvents.push(event);
     const region = state.regions[zoneId] ??= baseRegion(zoneId);
-    region.pressure = Math.min(5, (Number(region.pressure) || 0) + 1);
+    region.pressure = Math.min(5, finite(region.pressure, 0) + 1);
     region.lastEventId = event.id;
     if (definition.procession) {
       const routeIndex = Math.max(0, PROCESSION_ROUTE.indexOf(zoneId));
@@ -129,7 +216,7 @@ export class WorldStateManager {
   update(state, dt) {
     const normalized = this.normalize(state);
     Object.assign(state, normalized);
-    const delta = Math.max(0, Number(dt) || 0);
+    const delta = Math.max(0, finite(dt, 0));
     state.tick += delta;
     for (const event of state.activeEvents) event.elapsed += delta;
     if (state.procession) {
@@ -142,8 +229,8 @@ export class WorldStateManager {
         if (event) {
           const previous = event.zoneId;
           event.zoneId = state.procession.zoneId;
-          (state.regions[previous] ??= baseRegion(previous)).pressure = Math.max(0, (state.regions[previous]?.pressure ?? 0) - 0.35);
-          (state.regions[event.zoneId] ??= baseRegion(event.zoneId)).pressure = Math.min(5, (state.regions[event.zoneId]?.pressure ?? 0) + 0.75);
+          (state.regions[previous] ??= baseRegion(previous)).pressure = Math.max(0, finite(state.regions[previous]?.pressure, 0) - 0.35);
+          (state.regions[event.zoneId] ??= baseRegion(event.zoneId)).pressure = Math.min(5, finite(state.regions[event.zoneId]?.pressure, 0) + 0.75);
         }
       }
     }
@@ -154,15 +241,15 @@ export class WorldStateManager {
     const index = safeArray(state.activeEvents).findIndex((event) => event.id === eventId);
     if (index < 0) return null;
     const [event] = state.activeEvents.splice(index, 1);
-    const record = { ...clone(event), resolved: true, outcome: String(context.outcome ?? 'cleared'), resolvedAt: Number(state.tick) || 0 };
+    const record = { ...clone(event), resolved: true, outcome: safeText(context.outcome, 'cleared', 80), resolvedAt: Math.max(0, finite(state.tick, 0)) };
     state.resolvedEvents.push(record);
     if (state.resolvedEvents.length > 40) state.resolvedEvents.splice(0, state.resolvedEvents.length - 40);
     const region = state.regions[event.zoneId] ??= baseRegion(event.zoneId);
-    region.resolvedCount = (Number(region.resolvedCount) || 0) + 1;
-    region.pressure = Math.max(0, (Number(region.pressure) || 0) - 1.25);
+    region.resolvedCount = integer(finite(region.resolvedCount, 0) + 1, 0, 0, 1_000_000);
+    region.pressure = Math.max(0, finite(region.pressure, 0) - 1.25);
     region.lastOutcome = record.outcome;
     region.lastEventId = event.id;
-    region.echoes.push({ typeId: event.typeId, modifiers: clone(event.modifiers), outcome: record.outcome, resolvedAt: record.resolvedAt });
+    region.echoes.push({ typeId: event.typeId, modifiers: normalizeModifiers(event.modifiers), outcome: record.outcome, resolvedAt: record.resolvedAt });
     if (region.echoes.length > 12) region.echoes.shift();
     if (state.procession?.eventId === event.id) state.procession = null;
     return record;
@@ -172,12 +259,14 @@ export class WorldStateManager {
     const index = safeArray(state.activeEvents).findIndex((event) => event.id === eventId);
     if (index < 0) return null;
     const [event] = state.activeEvents.splice(index, 1);
-    const record = { ...clone(event), resolved: false, failed: true, outcome: String(context.outcome ?? 'failed'), resolvedAt: Number(state.tick) || 0 };
+    const record = { ...clone(event), resolved: false, failed: true, outcome: safeText(context.outcome, 'failed', 80), resolvedAt: Math.max(0, finite(state.tick, 0)) };
     state.resolvedEvents.push(record);
+    if (state.resolvedEvents.length > 40) state.resolvedEvents.splice(0, state.resolvedEvents.length - 40);
     const region = state.regions[event.zoneId] ??= baseRegion(event.zoneId);
-    region.failedCount = (Number(region.failedCount) || 0) + 1;
-    region.pressure = Math.min(5, (Number(region.pressure) || 0) + 1);
+    region.failedCount = integer(finite(region.failedCount, 0) + 1, 0, 0, 1_000_000);
+    region.pressure = Math.min(5, finite(region.pressure, 0) + 1);
     region.lastOutcome = record.outcome;
+    region.lastEventId = event.id;
     if (state.procession?.eventId === event.id) state.procession = null;
     return record;
   }
@@ -188,14 +277,15 @@ export class WorldStateManager {
     const region = normalized.regions[zoneId] ?? baseRegion(zoneId);
     result.resolvedCount = region.resolvedCount ?? 0;
     result.failedCount = region.failedCount ?? 0;
-    result.enemyDensity *= 1 + Math.min(0.35, Math.max(0, Number(region.pressure) || 0) * 0.04);
+    result.enemyDensity *= 1 + Math.min(0.35, Math.max(0, finite(region.pressure, 0)) * 0.04);
     for (const echo of safeArray(region.echoes)) {
       for (const id of safeArray(echo.modifiers?.lootBias)) if (!result.lootBias.includes(id)) result.lootBias.push(id);
     }
     for (const event of normalized.activeEvents.filter((entry) => entry.zoneId === zoneId)) mergeModifiers(result, event.modifiers);
-    result.enemyDensity = Math.max(1, Math.min(2.4, result.enemyDensity));
-    result.hunterPressure = Math.max(0, Math.min(1.5, result.hunterPressure));
-    result.eliteRate = Math.max(0, Math.min(0.65, result.eliteRate));
+    result.enemyDensity = bounded(result.enemyDensity, 1, 1, 2.4);
+    result.hunterPressure = bounded(result.hunterPressure, 0, 0, 1.5);
+    result.bleedPower = bounded(result.bleedPower, 0, 0, 5);
+    result.eliteRate = bounded(result.eliteRate, 0, 0, 0.65);
     return result;
   }
 

@@ -3,6 +3,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ACTION_VFX_FRAME_COUNT, ACTION_VFX_SHEETS, playerActionVfx, enemyActionVfx } from '../src/data/action-vfx.js';
+import { HERO_MOTION_ASSETS } from '../src/data/animation-v7.js';
 import { WorldGeometrySystem } from '../src/systems/world-geometry.js';
 import { GameEngine } from '../src/systems/game.js';
 
@@ -15,6 +16,8 @@ for (const id of heroClasses) {
   const png = readFileSync(file);
   assert.equal(png.readUInt32BE(16), 1536, `${id} sheet must be 8 columns wide`);
   assert.equal(png.readUInt32BE(20), 15360, `${id} sheet must contain 10 states x 8 frames`);
+  assert.equal(HERO_MOTION_ASSETS[id].src, `/assets/hero-motion-${id}-v7.png`, `${id} path must be manifest-owned`);
+  assert.equal(HERO_MOTION_ASSETS[id].required, true, `${id} body sheet must be release-required`);
 }
 for (const file of ['enemy-motion-a-v7.png','enemy-motion-b-v7.png','enemy-motion-c-v7.png','enemy-motion-d-v7.png']) {
   const png = readFileSync(asset(file));
@@ -36,7 +39,9 @@ const rendererSource = readFileSync(path.join(root,'src/systems/renderer.js'),'u
 const gameSource = readFileSync(path.join(root,'src/systems/game.js'),'utf8');
 const audioSource = readFileSync(path.join(root,'src/systems/audio.js'),'utf8');
 assert.match(rendererSource, /PLAYER_FACING_ANGLES\s*=\s*\[0, Math\.PI \* \.25/, 'hero presentation needs eight facings');
-assert.match(rendererSource, /hero-motion-.*-v7\.png/, 'hero renderer needs v7 motion sheets');
+assert.match(rendererSource, /HERO_MOTION_ASSETS/, 'hero renderer must consume the v7 motion manifest');
+assert.match(rendererSource, /player\.presentation\?\.resolvedClip/, 'hero renderer must consume resolved v7 clips');
+assert.doesNotMatch(rendererSource, /_heroMotionImage\(/, 'required hero motion must not use lazy optional loading');
 assert.match(rendererSource, /ground-decal/, 'renderer must support persistent ground decals');
 assert.match(gameSource, /WorldGeometrySystem/, 'gameplay must own physical world geometry');
 assert.match(gameSource, /_assignCombatSlot/, 'enemy choreography must use combat slots');

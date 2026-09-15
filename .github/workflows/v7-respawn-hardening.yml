@@ -1,0 +1,29 @@
+name: V7 Respawn Hardening
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: v7-respawn-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  respawn-animation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      npm_config_engine_strict: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - name: V7 respawn rise regression
+        run: node scripts/v7-respawn-animation.mjs

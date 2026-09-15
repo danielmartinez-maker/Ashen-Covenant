@@ -14,6 +14,10 @@ export const BOSS_DEFINITIONS = Object.freeze({
 });
 
 const affinities = new Set(['flame','grave','blood','light','storm','void']);
+const safeAttackCount = (enemy) => {
+  const count = Number(enemy?.attackCount);
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0;
+};
 
 export class BossController {
   constructor(domainEvents = null) {
@@ -47,10 +51,18 @@ export class BossController {
       modifiers: affinity === 'base' ? [] : [`${affinity}-pressure`, phaseNumber >= 3 ? `${affinity}-apex` : null].filter(Boolean),
       intermission: changed ? phaseDef.intermission : 0,
       punishWindow: phaseDef.punish,
-      enteredAt: changed ? now : previous?.enteredAt ?? now
+      enteredAt: changed ? now : previous?.enteredAt ?? now,
+      phaseAttackOffset: changed ? safeAttackCount(enemy) : previous?.phaseAttackOffset ?? 0
     };
     this.states.set(enemy.id, state);
-    if (changed) this.domainEvents?.emit?.('boss:phase-changed', { bossId: enemy.id, enemyId: enemy.templateId, phase: phaseNumber, variantId });
+    if (changed) {
+      const currentIntermission = Number.isFinite(Number(enemy.phaseTransition)) ? Math.max(0, Number(enemy.phaseTransition)) : 0;
+      enemy.phaseTransition = Math.max(currentIntermission, phaseDef.intermission);
+      enemy.windupLeft = 0;
+      enemy.telegraph = null;
+      enemy.state = 'phase-transition';
+      this.domainEvents?.emit?.('boss:phase-changed', { bossId: enemy.id, enemyId: enemy.templateId, phase: phaseNumber, variantId });
+    }
     return state;
   }
 
@@ -60,7 +72,10 @@ export class BossController {
     const resolved = state ?? this.states.get(enemy.id) ?? this.update(enemy, {});
     const phaseDef = definition.phases[Math.max(0, Math.min(2, (resolved.phase ?? 1) - 1))];
     const mechanics = phaseDef.mechanics;
-    const index = Math.max(0, Number(enemy.attackCount) || 0) % mechanics.length;
+    const phaseAttackOffset = Number.isFinite(Number(resolved.phaseAttackOffset)) ? Math.max(0, Math.floor(Number(resolved.phaseAttackOffset))) : 0;
+    const attackCount = safeAttackCount(enemy);
+    const launchedIndex = attackCount > 0 ? Math.max(0, attackCount - phaseAttackOffset - 1) : 0;
+    const index = launchedIndex % mechanics.length;
     const id = mechanics[index];
     return {
       id,

@@ -33,7 +33,9 @@ assert.match(rendererSource, /terrain-atlas-v5\.png/, 'live terrain must use the
 assert.match(rendererSource, /entrance-atlas-v5\.png/, 'live landmarks must use generated entrance art');
 assert.match(rendererSource, /environment-props-v5\.png/, 'live world props must use generated art');
 assert.match(rendererSource, /npc-atlas-v5\.png/, 'ambient NPCs must use generated art');
-assert.match(rendererSource, /hero-facing-atlas-v5\.png/, 'hero bodies must use fixed-facing art');
+assert.match(rendererSource, /HERO_MOTION_ASSETS/, 'hero bodies must use the required v7 fixed-facing manifest');
+assert.match(rendererSource, /resolvedClip\.row \* 8 \+ resolvedClip\.frame/, 'hero bodies must render the presentation-resolved fixed-facing frame');
+assert.doesNotMatch(rendererSource, /hero-facing-atlas-v5\.png/, 'live hero rendering must not fall back to the v5 static body atlas');
 assert.doesNotMatch(rendererSource, /ctx\.rotate\(player\.facing\)/, 'the player body must not freely rotate 360 degrees');
 assert.match(gameSource, /const GRAVITY = 1520/, 'a shared gravity constant must drive combat elevation');
 assert.match(gameSource, /const FACING_STEP = Math\.PI \/ 4/, 'body facing must use discrete 2.5D stances');

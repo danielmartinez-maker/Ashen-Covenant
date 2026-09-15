@@ -45,6 +45,56 @@ assert(game.endgame.routeContext.worldModifiers.corpseResurrection, 'Black Road 
 assert(game.endgame.routeContext.eclipseControls.extraRouteChoices >= 1, 'Black Road must freeze Eclipse controls at launch');
 assert.equal(game.endgame.bossCovenantVariant, 'grave', 'route context must force the authored boss affinity');
 assert(game.snapshot().activeOperation?.blackRoad, 'an active Black Road operation must serialize for reload without rerolling');
+
+// A restored checkpoint can only represent an authored contiguous prefix. A
+// corrupt save that claims a later room without its predecessors must resume at
+// the first missing room instead of advancing by the number of claimed IDs.
+const checkpointProbe = make();
+checkpointProbe.random = () => 0.1;
+assert(checkpointProbe.start('warden', 'thornseer'));
+const noncontiguousSnapshot = structuredClone(game.snapshot());
+noncontiguousSnapshot.activeOperation.completedStageIds = ['funeral-crypt'];
+checkpointProbe._restoreSnapshot(noncontiguousSnapshot);
+assert.deepEqual(
+  checkpointProbe.endgame.completedStageIds,
+  [],
+  'Black Road restore must discard completed stages that are not a contiguous authored prefix'
+);
+assert.equal(checkpointProbe.endgame.activeStage?.id, 'funeral-gate', 'corrupt later-stage claims must resume at the first authored room');
+
+// Authored route drafting removes already-owned boons from its pool, so every
+// boon is single-instance. A hostile save must not reintroduce duplicate boon
+// IDs (which would stack their modifiers repeatedly) or retain unknown route IDs.
+const routeIntegrityProbe = make();
+routeIntegrityProbe.random = () => 0.1;
+assert(routeIntegrityProbe.start('warden', 'thornseer'));
+const duplicatedRouteSnapshot = structuredClone(game.snapshot());
+duplicatedRouteSnapshot.activeOperation.expeditionBoons = ['breaker-route', 'breaker-route', 'not-an-authored-boon'];
+duplicatedRouteSnapshot.activeOperation.expeditionBanes = ['fragile', 'fragile', 'not-an-authored-bane'];
+routeIntegrityProbe._restoreSnapshot(duplicatedRouteSnapshot);
+assert.deepEqual(
+  routeIntegrityProbe.endgame.expeditionBoons,
+  ['breaker-route'],
+  'Black Road restore must keep each authored expedition boon at most once and discard unknown boon IDs'
+);
+assert.deepEqual(
+  routeIntegrityProbe.endgame.expeditionBanes,
+  ['fragile'],
+  'Black Road restore must keep each authored expedition bane at most once and discard unknown bane IDs'
+);
+
+// A truthy but malformed pending-route payload currently suppresses room spawn
+// on restore while offering no selectable route, producing a dead-end save.
+// Invalid junction state must fall back to the first unfinished authored room.
+const junctionRecoveryProbe = make();
+junctionRecoveryProbe.random = () => 0.1;
+assert(junctionRecoveryProbe.start('warden', 'thornseer'));
+const malformedJunctionSnapshot = structuredClone(game.snapshot());
+malformedJunctionSnapshot.activeOperation.pendingRoute = {};
+junctionRecoveryProbe._restoreSnapshot(malformedJunctionSnapshot);
+assert.equal(junctionRecoveryProbe.endgame.pendingRoute, null, 'malformed Black Road junction state must be discarded on restore');
+assert.equal(junctionRecoveryProbe.endgame.activeStage?.id, 'funeral-gate', 'discarding malformed junction state must respawn the first unfinished room');
+
 const frozenContext = JSON.parse(JSON.stringify(game.endgame.routeContext));
 game.save();
 const restored = make();

@@ -19,6 +19,7 @@ game.player.equipment.weapon = { id: 'test-worldspine', uniqueId: 'worldspine', 
 game._refreshPlayerStats(true);
 const resolved = game.getResolvedAbility('skillOne');
 assert.ok(resolved.equipmentHooks.includes('worldspine-rupture'), 'resolved abilities must consume equipped Unique hooks');
-assert.equal(game.player.equipmentPresentation.weaponKey, 'worldspine-rupture', 'stat refresh must publish equipment presentation state');
+assert.equal(game.player.equipment.weapon.uniqueId, 'worldspine', 'stat refresh must preserve the equipped chase item');
+assert.equal(game.player.equipmentPresentation, undefined, 'stat refresh must not publish legacy presentation state');
 
 console.log('Ashen Covenant LootSystem engine integration passed.');

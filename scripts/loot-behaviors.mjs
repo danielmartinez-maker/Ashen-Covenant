@@ -47,13 +47,8 @@ const equipped = {
   weapon: { uniqueId: 'worldspine', rarity: 'mythic', slot: 'weapon', name: 'Worldspine' },
   head: { uniqueId: 'drowned-sovereigns-crown', rarity: 'unique', slot: 'head', name: 'Drowned Sovereign’s Crown' }
 };
-const presentation = loot.presentationForEquipment(equipped, { primary: 'void', secondary: 'storm' });
-assert.equal(presentation.heroKey, 'worldspine');
-assert.equal(presentation.weaponKey, 'worldspine-rupture');
-assert.equal(presentation.auraKey, 'drowned-sovereign-ward');
-
 const hooks = loot.abilityHooks(equipped, 'warden:spirit-nail');
 assert.ok(Array.isArray(hooks));
 assert.ok(hooks.some((hook) => hook.source === 'worldspine'), 'equipped Uniques must participate in the ability resolver through normalized hooks');
 
-console.log(`loot behaviors: ${UNIQUES.length} uniques, ${formerStatOnly.length} chase mechanics, source ordering and presentation verified`);
+console.log(`loot behaviors: ${UNIQUES.length} uniques, ${formerStatOnly.length} chase mechanics and source ordering verified`);

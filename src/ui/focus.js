@@ -37,7 +37,10 @@ export class FocusNavigator {
 
   focusInitial(preferredSelector = null) {
     const preferred = preferredSelector ? this.scope?.querySelector?.(preferredSelector) : null;
-    const target = isUsable(preferred) ? preferred : this.scope?.querySelector?.('[autofocus], [aria-current="page"], .is-active') ?? this.focusables()[0];
+    const automatic = this.scope?.querySelectorAll
+      ? [...this.scope.querySelectorAll('[autofocus], [aria-current="page"], .is-active')].find(isUsable)
+      : null;
+    const target = isUsable(preferred) ? preferred : automatic ?? this.focusables()[0];
     target?.focus?.({ preventScroll: true });
     target?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     return target ?? null;

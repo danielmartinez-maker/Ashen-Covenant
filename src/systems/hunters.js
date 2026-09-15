@@ -12,9 +12,28 @@ export const HUNTER_ADAPTATIONS = Object.freeze([
 const rewardForFaction = Object.freeze({
   grave: 'black-lantern', blood: 'black-lantern', iron: 'unbowed-pact', void: 'wraith-gallows', storm: 'worldspine'
 });
+const HUNTER_REWARD_IDS = new Set(Object.values(rewardForFaction));
+const ADAPTATION_IDS = new Set(HUNTER_ADAPTATIONS.map((entry) => entry.id));
+const FACTION_IDS = new Set(Object.keys(rewardForFaction));
 let nextHunter = 1;
-const unique = (values = []) => [...new Set(values.filter(Boolean))];
+const array = (value) => Array.isArray(value) ? value : [];
+const record = (value) => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
+const bounded = (value, fallback, min, max) => Math.max(min, Math.min(max, finite(value, fallback)));
+const text = (value, fallback, max = 120) => typeof value === 'string' && value.trim() ? value.slice(0, max) : fallback;
+const uniqueStrings = (values, { allowed = null, max = 24, maxLength = 80 } = {}) => [...new Set(array(values)
+  .filter((value) => typeof value === 'string' && value.trim())
+  .map((value) => value.slice(0, maxLength))
+  .filter((value) => !allowed || allowed.has(value)))]
+  .slice(0, max);
 const clone = (value) => JSON.parse(JSON.stringify(value));
+const reserveHunterId = (id) => {
+  const match = /^hunter-(\d+)$/.exec(id);
+  if (!match) return id;
+  const numeric = Number(match[1]);
+  if (Number.isSafeInteger(numeric) && numeric >= 0 && numeric < Number.MAX_SAFE_INTEGER) nextHunter = Math.max(nextHunter, numeric + 1);
+  return id;
+};
 
 function adaptationCandidates(context = {}) {
   const source = String(context.source ?? '').toLowerCase();
@@ -26,37 +45,46 @@ function adaptationCandidates(context = {}) {
   if (/projectile|bolt|arrow|spear|comet|javelin/.test(source)) out.push('nullstep', 'mirrorborn');
   if (/fire|blood/.test(source) || /fire|blood/.test(damageType)) out.push('scar-ground');
   out.push('war-call');
-  return unique(out);
+  return uniqueStrings(out, { allowed: ADAPTATION_IDS, max: 6 });
 }
 
 export class HunterSystem {
   normalize(hunter = {}) {
+    hunter = record(hunter);
+    const knowledge = record(hunter.knowledge);
+    const factionId = FACTION_IDS.has(hunter.factionId) ? hunter.factionId : 'grave';
+    const requestedRewardId = typeof hunter.targetRewardId === 'string' ? hunter.targetRewardId.trim() : '';
+    const targetRewardId = HUNTER_REWARD_IDS.has(requestedRewardId)
+      ? requestedRewardId
+      : rewardForFaction[factionId] ?? 'black-lantern';
+    const storedId = text(hunter.id, null, 96);
+    const id = storedId ? reserveHunterId(storedId) : `hunter-${nextHunter++}`;
     return {
-      id: hunter.id ?? `hunter-${nextHunter++}`,
-      name: hunter.name ?? 'Scarred Hunter',
-      templateId: hunter.templateId ?? 'mireling',
-      factionId: hunter.factionId ?? 'grave',
-      level: Math.max(1, Number(hunter.level) || 1),
-      victories: Math.max(1, Number(hunter.victories) || 1),
-      defeats: Math.max(0, Number(hunter.defeats) || 0),
-      grudge: Math.max(1, Number(hunter.grudge) || 1),
-      adaptations: unique(hunter.adaptations ?? hunter.traits ?? []).slice(0, 6),
-      scars: unique(hunter.scars ?? []).slice(0, 6),
+      id,
+      name: text(hunter.name, 'Scarred Hunter', 120),
+      templateId: text(hunter.templateId, 'mireling', 96),
+      factionId,
+      level: Math.floor(bounded(hunter.level, 1, 1, 120)),
+      victories: Math.floor(bounded(hunter.victories, 1, 1, 1_000_000)),
+      defeats: Math.floor(bounded(hunter.defeats, 0, 0, 1_000_000)),
+      grudge: Math.floor(bounded(hunter.grudge, 1, 1, 99)),
+      adaptations: uniqueStrings(array(hunter.adaptations).length ? hunter.adaptations : hunter.traits, { allowed: ADAPTATION_IDS, max: 6 }),
+      scars: uniqueStrings(hunter.scars, { max: 6, maxLength: 120 }),
       knowledge: {
-        damageTypes: unique(hunter.knowledge?.damageTypes ?? []),
-        sources: unique(hunter.knowledge?.sources ?? []),
-        covenants: unique(hunter.knowledge?.covenants ?? [])
+        damageTypes: uniqueStrings(knowledge.damageTypes, { max: 24 }),
+        sources: uniqueStrings(knowledge.sources, { max: 24 }),
+        covenants: uniqueStrings(knowledge.covenants, { max: 12 })
       },
-      targetRewardId: hunter.targetRewardId ?? rewardForFaction[hunter.factionId] ?? 'black-lantern',
-      nextEligibleAt: Math.max(0, Number(hunter.nextEligibleAt) || 0),
-      lastSeenAt: Math.max(0, Number(hunter.lastSeenAt) || 0),
+      targetRewardId,
+      nextEligibleAt: bounded(hunter.nextEligibleAt, 0, 0, Number.MAX_SAFE_INTEGER),
+      lastSeenAt: bounded(hunter.lastSeenAt, 0, 0, Number.MAX_SAFE_INTEGER),
       defeated: hunter.defeated === true,
-      legacyNemesisId: hunter.legacyNemesisId ?? null
+      legacyNemesisId: typeof hunter.legacyNemesisId === 'string' ? hunter.legacyNemesisId.slice(0, 96) : null
     };
   }
 
   createFromVictor(enemy = {}, context = {}) {
-    const factionId = enemy.doctrineFaction ?? context.factionId ?? 'grave';
+    const factionId = FACTION_IDS.has(enemy.doctrineFaction) ? enemy.doctrineFaction : FACTION_IDS.has(context.factionId) ? context.factionId : 'grave';
     const source = String(context.source ?? enemy.attack ?? 'unknown');
     const primary = context.covenant?.primary ?? null;
     return this.normalize({
@@ -70,20 +98,20 @@ export class HunterSystem {
       knowledge: { sources: [source], damageTypes: [], covenants: primary ? [primary] : [] },
       adaptations: adaptationCandidates({ source }).slice(0, 1),
       targetRewardId: rewardForFaction[factionId] ?? 'black-lantern',
-      nextEligibleAt: (context.now ?? 0) + 45
+      nextEligibleAt: finite(context.now, 0) + 45
     });
   }
 
   recordVictory(hunter, context = {}) {
     const next = this.normalize(hunter);
-    next.victories += 1;
+    next.victories = Math.min(1_000_000, next.victories + 1);
     next.grudge = Math.min(99, next.grudge + 2);
     next.level = Math.min(120, next.level + 1);
-    next.lastSeenAt = Math.max(next.lastSeenAt, Number(context.now) || 0);
-    next.nextEligibleAt = next.lastSeenAt + Math.min(180, 35 + next.victories * 12);
-    next.knowledge.damageTypes = unique([...next.knowledge.damageTypes, context.damageType]);
-    next.knowledge.sources = unique([...next.knowledge.sources, context.source]);
-    next.knowledge.covenants = unique([...next.knowledge.covenants, context.covenant?.primary]);
+    next.lastSeenAt = Math.max(next.lastSeenAt, bounded(context.now, 0, 0, Number.MAX_SAFE_INTEGER));
+    next.nextEligibleAt = Math.min(Number.MAX_SAFE_INTEGER, next.lastSeenAt + Math.min(180, 35 + next.victories * 12));
+    next.knowledge.damageTypes = uniqueStrings([...next.knowledge.damageTypes, context.damageType], { max: 24 });
+    next.knowledge.sources = uniqueStrings([...next.knowledge.sources, context.source], { max: 24 });
+    next.knowledge.covenants = uniqueStrings([...next.knowledge.covenants, context.covenant?.primary], { max: 12 });
     const candidates = adaptationCandidates(context);
     for (const id of candidates) {
       if (!next.adaptations.includes(id)) next.adaptations.push(id);
@@ -93,7 +121,8 @@ export class HunterSystem {
   }
 
   chooseIntrusion(hunters = [], { now = 0, zoneId = null } = {}) {
-    const eligible = hunters.map((hunter) => this.normalize(hunter)).filter((hunter) => !hunter.defeated && hunter.nextEligibleAt <= now);
+    const currentTime = bounded(now, 0, 0, Number.MAX_SAFE_INTEGER);
+    const eligible = array(hunters).map((hunter) => this.normalize(hunter)).filter((hunter) => !hunter.defeated && hunter.nextEligibleAt <= currentTime);
     if (!eligible.length) return null;
     const preferred = eligible.find((hunter) => {
       if (zoneId === 'redfen') return hunter.factionId === 'blood';
@@ -130,8 +159,8 @@ export class HunterSystem {
 
   recordDefeat(hunter, { now = 0 } = {}) {
     const next = this.normalize(hunter);
-    next.defeats += 1;
-    next.lastSeenAt = now;
+    next.defeats = Math.min(1_000_000, next.defeats + 1);
+    next.lastSeenAt = bounded(now, 0, 0, Number.MAX_SAFE_INTEGER);
     next.defeated = true;
     return { hunter: next, defeated: true, rewardId: next.targetRewardId };
   }
