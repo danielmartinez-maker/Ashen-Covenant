@@ -5,7 +5,7 @@ import { resolveCovenantPresentationIdentity } from './covenant-identity.js';
 
 const FACING_STEP = Math.PI / 4;
 const COVENANT_AFFINITIES = Object.freeze(['flame', 'grave', 'blood', 'light', 'storm', 'void']);
-const freezeRecord = (value) => Object.freeze({ ...(value ?? {}) });
+const EQUIPMENT_SLOTS = Object.freeze(['weapon', 'offhand', 'head', 'chest', 'gloves', 'pants', 'boots', 'amulet', 'ring']);
 const finite = (value, fallback = 0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
 const isRecord = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const corruptionLevelFor = (item = {}) => {
@@ -46,6 +46,29 @@ const settingsContextFor = (settings = {}) => SETTINGS_PRESETS[
   | (settings.reducedFlashing === true ? 2 : 0)
   | (settings.reducedVfx === true ? 1 : 0)
 ];
+const snapshotItem = (item) => item ? Object.freeze({
+  ref: item,
+  id: item.id ?? null,
+  slot: item.slot ?? null,
+  baseId: item.baseId ?? null,
+  uniqueId: item.uniqueId ?? null,
+  visualSignatureId: item.visualSignatureId ?? null,
+  rarity: item.rarity ?? 'common',
+  masterworkRank: finite(item.masterworkRank ?? item.masterwork, 0),
+  corruption: corruptionLevelFor(item)
+}) : null;
+const snapshotMatches = (item, snapshot) => {
+  if (!item || !snapshot) return item === snapshot;
+  return snapshot.ref === item
+    && snapshot.id === (item.id ?? null)
+    && snapshot.slot === (item.slot ?? null)
+    && snapshot.baseId === (item.baseId ?? null)
+    && snapshot.uniqueId === (item.uniqueId ?? null)
+    && snapshot.visualSignatureId === (item.visualSignatureId ?? null)
+    && snapshot.rarity === (item.rarity ?? 'common')
+    && snapshot.masterworkRank === finite(item.masterworkRank ?? item.masterwork, 0)
+    && snapshot.corruption === corruptionLevelFor(item);
+};
 
 export const neutralPresentationCombatContext = () => Object.freeze({
   actorId: null, actorKind: 'unknown', enemyRole: null, bossId: null, hunterId: null,
@@ -65,6 +88,7 @@ export const neutralPresentationCombatContext = () => Object.freeze({
 export class PresentationCombatContextResolver {
   constructor() {
     this.playerCovenantCache = { state: null, revision: '', overview: null };
+    this.equipmentCache = { record: null, snapshots: null, summary: null };
     this.hybridCache = new Map();
   }
   _playerCovenant(game, player) {
@@ -76,6 +100,52 @@ export class PresentationCombatContextResolver {
     const overview = game.getCovenantOverview?.() ?? {};
     this.playerCovenantCache = { state, revision, overview };
     return overview;
+  }
+  _equipmentSummary(equipmentRecord) {
+    const cached = this.equipmentCache;
+    if (cached.record === equipmentRecord && cached.snapshots && cached.summary) {
+      let unchanged = true;
+      for (const slot of EQUIPMENT_SLOTS) {
+        if (!snapshotMatches(equipmentRecord[slot] ?? null, cached.snapshots[slot] ?? null)) { unchanged = false; break; }
+      }
+      if (unchanged) return cached.summary;
+    }
+
+    const snapshots = {};
+    const visibleEquipment = [];
+    const visualSignatureIds = [];
+    let masterworkRank = 0;
+    let corruptionLevel = 0;
+    for (const slot of EQUIPMENT_SLOTS) {
+      const item = equipmentRecord[slot];
+      if (!isRecord(item)) { snapshots[slot] = null; continue; }
+      const snapshot = snapshotItem(item);
+      snapshots[slot] = snapshot;
+      const visualSignatureId = signatureIdFor(item);
+      const visible = Object.freeze({
+        id: snapshot.id,
+        slot: snapshot.slot,
+        baseId: snapshot.baseId,
+        uniqueId: snapshot.uniqueId,
+        visualSignatureId,
+        rarity: snapshot.rarity,
+        masterworkRank: snapshot.masterworkRank,
+        corruption: snapshot.corruption
+      });
+      visibleEquipment.push(visible);
+      if (visualSignatureId) visualSignatureIds.push(visualSignatureId);
+      masterworkRank = Math.max(masterworkRank, visible.masterworkRank);
+      corruptionLevel = Math.max(corruptionLevel, visible.corruption);
+    }
+    const summary = Object.freeze({
+      visibleEquipment: Object.freeze(visibleEquipment),
+      visualSignatureIds: Object.freeze(visualSignatureIds),
+      masterworkRank,
+      corruptionLevel,
+      offhandFamily: equipmentRecord.offhand?.baseId ?? null
+    });
+    this.equipmentCache = { record: equipmentRecord, snapshots, summary };
+    return summary;
   }
   _hybrid(primaryClass, secondaryClass) {
     if (!primaryClass || !secondaryClass) return null;
@@ -97,19 +167,7 @@ export class PresentationCombatContextResolver {
         ? actor.covenantPresentation
         : resolveCovenantPresentationIdentity(covenant, { abilityId: detail.abilityId, mutationId: detail.mutationId });
       const equipmentRecord = isRecord(actor.equipment) ? actor.equipment : {};
-      const equipment = Object.values(equipmentRecord).filter((item) => isRecord(item));
-      const visibleEquipment = equipment.map((item) => Object.freeze({
-        id: item.id ?? null,
-        slot: item.slot,
-        baseId: item.baseId ?? null,
-        uniqueId: item.uniqueId ?? null,
-        visualSignatureId: signatureIdFor(item),
-        rarity: item.rarity ?? 'common',
-        masterworkRank: finite(item.masterworkRank ?? item.masterwork, 0),
-        corruption: corruptionLevelFor(item)
-      }));
-      const equippedMasterworkRank = visibleEquipment.reduce((maximum, item) => Math.max(maximum, item.masterworkRank), 0);
-      const equippedCorruptionLevel = visibleEquipment.reduce((maximum, item) => Math.max(maximum, item.corruption), 0);
+      const equipment = playerActor ? this._equipmentSummary(equipmentRecord) : this._equipmentSummary(equipmentRecord);
       const hit = detail.hitResult ?? detail.result ?? {};
       const zone = zoneAt(actor.x ?? player?.x ?? 0, actor.y ?? player?.y ?? 0);
       const primaryClass = typeof actor.primary === 'string' ? actor.primary : null;
@@ -126,11 +184,11 @@ export class PresentationCombatContextResolver {
         facingLane: laneFor(actor.presentation?.visualFacing ?? actor.presentation?.locomotion?.visualFacing ?? actor.facing ?? 0), movementState: actor.presentation?.locomotion?.state ?? actor.state ?? 'idle',
         movementIntensity: clamp(finite(actor.presentation?.locomotion?.speedRatio, Math.hypot(actor.moveX ?? 0, actor.moveY ?? 0) / 250), 0, 1.5),
         elevation: Math.max(0, finite(actor.elevation, 0)), grounded: actor.grounded !== false, surface: actor.surface ?? 'stone', region: zone.id,
-        weaponFamily: actor.presentation?.profile?.weapon ?? null, offhandFamily: equipmentRecord.offhand?.baseId ?? null,
-        visibleEquipment: Object.freeze(visibleEquipment), rarity: detail.rarity ?? 'common',
-        corruptionLevel: Math.max(equippedCorruptionLevel, finite(detail.corruptionLevel, 0)),
-        masterworkRank: Math.max(equippedMasterworkRank, finite(detail.masterworkRank, 0)),
-        visualSignatureIds: Object.freeze(visibleEquipment.map((item) => item.visualSignatureId).filter(Boolean)),
+        weaponFamily: actor.presentation?.profile?.weapon ?? null, offhandFamily: equipment.offhandFamily,
+        visibleEquipment: equipment.visibleEquipment, rarity: detail.rarity ?? 'common',
+        corruptionLevel: Math.max(equipment.corruptionLevel, finite(detail.corruptionLevel, 0)),
+        masterworkRank: Math.max(equipment.masterworkRank, finite(detail.masterworkRank, 0)),
+        visualSignatureIds: equipment.visualSignatureIds,
         covenantPrimary: covenant.primary ?? 'unbound', covenantSecondary: covenant.secondary ?? null, covenantStage: finite(covenant.stage, 0),
         covenantInstability: finite(covenant.instability, 0), covenantRupture: Boolean(covenant.ruptureActive), covenantIdentity,
         hitWeight: detail.hitWeight ?? hit.weight ?? (detail.critical ? 'heavy' : 'light'), damageFamily: detail.damageFamily ?? detail.damageType ?? 'physical',
