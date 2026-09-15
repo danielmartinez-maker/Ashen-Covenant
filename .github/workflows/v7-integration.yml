@@ -41,3 +41,5 @@ jobs:
         run: node --expose-gc scripts/performance-v6.mjs
       - name: V7 audio certification
         run: npm run test:v7:audio
+      - name: Electron file protocol certification
+        run: npm run test:file-protocol
