@@ -34,7 +34,7 @@ const audio = {
 
 const item = {
   id: 'eq-unique', name: 'Bell-Sunder', slot: 'weapon', baseId: 'cleaver', rarity: 'unique', uniqueId: 'bell-sunder',
-  masterwork: 12, corruption: 2, runeIds: ['ember-rune'], itemLevel: 72, affixes: [{ stat: 'power', value: 17 }]
+  masterwork: 12, corruption: 'grave-taint', runeIds: ['ember-rune'], itemLevel: 72, affixes: [{ stat: 'power', value: 17 }]
 };
 const source = SaveMigrator.migrate({
   version: 19, primary: 'warden', secondary: 'thornseer', stats: { kills: 700, bosses: 31, deaths: 4 }, activeOperation: null,
@@ -57,17 +57,18 @@ presentation.update(0.1);
 assert.equal(game.player.level, 83);
 assert.equal(game.player.equipment.weapon.uniqueId, 'bell-sunder');
 assert.equal(game.player.equipment.weapon.masterwork, 12);
-assert.equal(game.player.equipment.weapon.corruption, 2);
+assert.equal(game.player.equipment.weapon.corruption, 'grave-taint');
 assert.ok(game.player.presentation.resolvedClip, 'loaded player must resolve a v7 animation clip');
 assert.ok(game.player.presentation.equipmentAppearance, 'loaded equipment must resolve v7 appearance state');
 assert.ok(game.player.presentation.equipmentAppearance.signatureIds.includes('unique:bell-sunder'), 'loaded Unique identity must remain visible');
+assert.equal(game.player.presentation.equipmentAppearance.corruptionTier, 1, 'persisted corruption marker must still affect v7 appearance');
 assert.equal(game.save(), true);
 
 const roundTrip = loadSave();
 assert.equal(roundTrip.version, SAVE_SCHEMA_V19);
 assert.equal(roundTrip.player.equipment.weapon.uniqueId, 'bell-sunder');
 assert.equal(roundTrip.player.equipment.weapon.masterwork, 12);
-assert.equal(roundTrip.player.equipment.weapon.corruption, 2);
+assert.equal(roundTrip.player.equipment.weapon.corruption, 'grave-taint');
 assert.equal(roundTrip.player.level, 83);
 assert.equal(roundTrip.player.covenant.stage, 4);
 const serialized = JSON.stringify(roundTrip);
