@@ -9,6 +9,7 @@ const percentile = (values, amount) => {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * amount))] ?? 0;
 };
+const median = (values) => percentile(values, .5);
 const mean = (values) => values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
 const measure = (frames, callback) => {
   const values = [];
@@ -19,6 +20,11 @@ const measure = (frames, callback) => {
   }
   return { average: mean(values), p95: percentile(values, .95), max: Math.max(...values) };
 };
+const summarize = (samples) => ({
+  average: median(samples.map((sample) => sample.average)),
+  p95: median(samples.map((sample) => sample.p95)),
+  max: median(samples.map((sample) => sample.max))
+});
 
 const makeInput = () => ({
   pointer: { active: false, down: false, commandDirty: false, worldX: 0, worldY: 0 }, queue: [],
@@ -67,16 +73,30 @@ const legacyUpdate = () => {
 };
 const v7Update = () => v7Fixture.presentation.update(1 / 60);
 
-for (let frame = 0; frame < 120; frame += 1) legacyUpdate();
-for (let frame = 0; frame < 120; frame += 1) v7Update();
+for (let frame = 0; frame < 240; frame += 1) {
+  legacyUpdate();
+  v7Update();
+}
 
 globalThis.gc?.();
 const heapBefore = process.memoryUsage().heapUsed;
-const legacy = measure(900, legacyUpdate);
-const embodied = measure(900, v7Update);
+const legacySamples = [];
+const embodiedSamples = [];
+for (let round = 0; round < 5; round += 1) {
+  globalThis.gc?.();
+  if (round % 2 === 0) {
+    legacySamples.push(measure(900, legacyUpdate));
+    embodiedSamples.push(measure(900, v7Update));
+  } else {
+    embodiedSamples.push(measure(900, v7Update));
+    legacySamples.push(measure(900, legacyUpdate));
+  }
+}
 globalThis.gc?.();
 const heapAfter = process.memoryUsage().heapUsed;
 
+const legacy = summarize(legacySamples);
+const embodied = summarize(embodiedSamples);
 const ratio = embodied.p95 / Math.max(0.001, legacy.p95);
 const heapDeltaMb = (heapAfter - heapBefore) / 1024 / 1024;
 const equipmentCache = v7Fixture.presentation.equipmentAppearanceResolver.debug();
@@ -86,6 +106,7 @@ const results = {
   legacy,
   embodied,
   ratio,
+  samples: { legacy: legacySamples, embodied: embodiedSamples },
   actorCount,
   animationBudget: debug.animation.budget,
   equipmentCache,
