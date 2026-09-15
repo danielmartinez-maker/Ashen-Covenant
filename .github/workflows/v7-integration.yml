@@ -33,5 +33,11 @@ jobs:
         run: node scripts/migration-matrix-v6.mjs
       - name: V6 architecture boundaries
         run: node scripts/architecture-boundaries-v6.mjs
+      - name: V7 presentation overhead budget
+        run: node --expose-gc scripts/performance-v7.mjs
+      - name: Presentation absolute performance budget
+        run: node --expose-gc scripts/presentation-performance.mjs
+      - name: V6 performance compatibility
+        run: node --expose-gc scripts/performance-v6.mjs
       - name: V7 audio certification
         run: npm run test:v7:audio
