@@ -54,7 +54,7 @@ app.whenReady().then(async () => {
   assert.equal(Object.keys(assetDiagnosis.heroMotion).length, 6, 'all six v7 class motion atlases must load');
   for (const [id, motion] of Object.entries(assetDiagnosis.heroMotion)) {
     assert.ok(motion.source.includes(`/dist/assets/hero-motion-${id}-v7.png`), `${id} hero motion must resolve inside packaged dist/assets`);
-    assert.ok(motion.width > 0 && motion.height > 0, `${id} hero motion atlas must decode`);
+    assert.ok(motion.width >= 1_000 && motion.height >= 1_000, `${id} hero motion atlas must decode at release scale`);
   }
   for (const [id, motion] of Object.entries(assetDiagnosis.enemyMotion)) {
     assert.ok(motion.source.includes(`/dist/assets/enemy-motion-${id}-v7.png`), `${id} enemy-motion art must resolve inside packaged dist/assets`);
@@ -80,6 +80,27 @@ app.whenReady().then(async () => {
   assert.ok(assetDiagnosis.propSource.includes('/dist/assets/environment-props-v5.png'), 'world prop art must resolve inside packaged dist/assets');
   assert.ok(assetDiagnosis.npcSource.includes('/dist/assets/npc-atlas-v5.png'), 'NPC art must resolve inside packaged dist/assets');
 
+  const audioChecks = await window.webContents.executeJavaScript(`(async () => Promise.all([
+    'swing-heavy-a.wav', 'impact-plate.wav', 'guard-break.wav', 'spell-impact.wav',
+    'execution-contact.wav', 'hunter-intrusion.wav', 'boss-phase.wav', 'cov-grave.wav', 'ambience-storm.wav'
+  ].map(async (name) => {
+    const response = await fetch(new URL('./assets/audio/v7/' + name, location.href));
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    return {
+      name,
+      ok: response.ok,
+      riff: String.fromCharCode(...bytes.slice(0, 4)),
+      wave: String.fromCharCode(...bytes.slice(8, 12)),
+      size: bytes.length
+    };
+  })))()`);
+  for (const audio of audioChecks) {
+    assert.equal(audio.ok, true, `${audio.name} must load through packaged file:// assets`);
+    assert.equal(audio.riff, 'RIFF', `${audio.name} must retain a RIFF header`);
+    assert.equal(audio.wave, 'WAVE', `${audio.name} must retain a WAVE header`);
+    assert.ok(audio.size > 4_800, `${audio.name} must contain authored waveform data`);
+  }
+
   const titleDiagnosis = await window.webContents.executeJavaScript(`(() => {
     document.querySelectorAll('.class-card')[0]?.click();
     document.querySelectorAll('.class-card')[1]?.click();
@@ -96,6 +117,7 @@ app.whenReady().then(async () => {
     const launched = game.startBlackRoadExpedition('funeral-road');
     if (!launched) throw new Error(JSON.stringify({ launched, state: game.state, player: Boolean(game.player), objective: game.objective }));
     if (!game.entities.enemies[3]) throw new Error(JSON.stringify({ launched, enemyCount: game.entities.enemies.length, endgame: game.endgame }));
+    game.presentation?.update?.(1 / 60);
     game.player.hp = game.player.maxHp;
     game.entities.enemies.forEach((enemy) => { enemy.recoveryLeft = 4; });
     game.player.combatTargetId = game.entities.enemies[1].id;
@@ -103,11 +125,19 @@ app.whenReady().then(async () => {
     game._startEnemyAttack(game.entities.enemies[2]);
     game._focusCamera(true);
     ui.updateHud(true);
-    return { state: game.state, enemies: game.entities.enemies.length, target: game.getCombatTarget()?.name };
+    return {
+      state: game.state,
+      enemies: game.entities.enemies.length,
+      target: game.getCombatTarget()?.name,
+      resolvedClip: game.player.presentation?.resolvedClip?.clipId ?? null,
+      equipmentAppearance: Boolean(game.player.presentation?.equipmentAppearance)
+    };
   })()`);
   assert.equal(combatDiagnosis.state, 'playing', 'a verified file:// build must start a run');
   assert.equal(combatDiagnosis.enemies, 4, 'the rendered check needs the complete first Black Road formation');
   assert.ok(combatDiagnosis.target, 'context target UI must resolve in the packaged build');
+  assert.ok(combatDiagnosis.resolvedClip, 'packaged Black Road must resolve a v7 player animation clip');
+  assert.equal(combatDiagnosis.equipmentAppearance, true, 'packaged Black Road must resolve v7 equipment appearance state');
   await wait(180);
   const screenshot = (await window.webContents.capturePage()).toPNG();
   const screenshotPath = screenshot.length > 4_000 ? output : null;
@@ -115,7 +145,7 @@ app.whenReady().then(async () => {
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(screenshotPath, screenshot);
   }
-  console.log(JSON.stringify({ ...assetDiagnosis, ...combatDiagnosis, screenshot: screenshotPath }, null, 2));
+  console.log(JSON.stringify({ ...assetDiagnosis, audioChecks, ...combatDiagnosis, screenshot: screenshotPath }, null, 2));
   window.destroy();
   app.quit();
 }).catch((error) => {
