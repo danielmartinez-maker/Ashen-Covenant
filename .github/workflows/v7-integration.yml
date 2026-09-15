@@ -27,5 +27,11 @@ jobs:
       - run: npm ci
       - name: Integrated embodied combat regression
         run: node scripts/v7-embodied-combat.mjs
+      - name: V7 architecture compatibility
+        run: node scripts/v7-architecture-compatibility.mjs
+      - name: V6 migration compatibility
+        run: node scripts/migration-matrix-v6.mjs
+      - name: V6 architecture boundaries
+        run: node scripts/architecture-boundaries-v6.mjs
       - name: V7 audio certification
         run: npm run test:v7:audio
