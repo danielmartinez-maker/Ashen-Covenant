@@ -1,0 +1,31 @@
+name: V7 Integration
+
+on:
+  push:
+    branches:
+      - v7-embodied-covenant
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: v7-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  embodied-combat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      npm_config_engine_strict: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+      - run: npm ci
+      - name: Integrated embodied combat regression
+        run: node scripts/v7-embodied-combat.mjs
+      - name: V7 audio certification
+        run: npm run test:v7:audio
