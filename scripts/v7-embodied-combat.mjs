@@ -241,8 +241,8 @@ for (let desiredStage = 1; desiredStage <= 5; desiredStage += 1) {
   presentation.update(1 / 60);
   assert.equal(presentation.getContext().playerInTown, true, 'fresh run must present Sanctuary as town context');
   assert.equal(game.startBlackRoadExpedition('funeral-road'), true, 'authored Funeral Road expedition must launch');
-  presentation.update(1 / 60);
-  assert.notEqual(presentation.getContext().currentDungeon, null, 'Black Road must resolve a dungeon context');
+  presentation.update(0.1);
+  assert.notEqual(presentation.getContext().currentDungeon, null, 'Black Road must resolve a dungeon context after the normal context sample interval');
   assert.ok(game.entities.enemies.length >= 1, 'Black Road must populate a live formation');
   assert.ok(game.player.presentation.resolvedClip, 'v7 body clip must survive expedition transition');
   assert.ok(game.player.presentation.equipmentAppearance, 'equipment appearance must survive expedition transition');
