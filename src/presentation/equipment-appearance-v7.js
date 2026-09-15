@@ -22,6 +22,10 @@ const stableItem = (item) => item ? [
   item.id ?? '', item.baseId ?? '', item.uniqueId ?? '', item.rarity ?? 'common',
   finite(item.masterworkRank ?? item.masterwork, 0), corruptionLevelFor(item)
 ].join(':') : '-';
+const hasVisibleEquipment = (equipment = {}) => Boolean(
+  equipment.boots || equipment.chest || equipment.head || equipment.gloves ||
+  equipment.offhand || equipment.weapon || equipment.amulet || equipment.ring
+);
 
 export const equipmentLayerOrderForFacing = (layer = {}, facingLane = 0) => {
   const authored = finite(layer.order, 0);
@@ -32,12 +36,14 @@ export const equipmentLayerOrderForFacing = (layer = {}, facingLane = 0) => {
   return authored;
 };
 
-export const equipmentAppearanceRevisionKey = (equipment = {}, covenantIdentity = {}, reducedVfx = false, facingLane = 0) => [
-  ...IDENTITY_ORDER.map((slot) => `${slot}=${stableItem(equipment[slot])}`),
-  `cov=${covenantIdentity.affinity ?? covenantIdentity.primary ?? 'unbound'}:${finite(covenantIdentity.stage, 0)}`,
-  `reduced=${Boolean(reducedVfx)}`,
-  `facing=${facingLaneFor(facingLane)}`
-].join('|');
+export const equipmentAppearanceRevisionKey = (equipment = {}, covenantIdentity = {}, reducedVfx = false, facingLane = 0) => {
+  const suffix = `cov=${covenantIdentity.affinity ?? covenantIdentity.primary ?? 'unbound'}:${finite(covenantIdentity.stage, 0)}|reduced=${Boolean(reducedVfx)}|facing=${facingLaneFor(facingLane)}`;
+  if (!hasVisibleEquipment(equipment)) return `empty|${suffix}`;
+  return [
+    ...IDENTITY_ORDER.map((slot) => `${slot}=${stableItem(equipment[slot])}`),
+    suffix
+  ].join('|');
+};
 
 export class EquipmentAppearanceResolver {
   constructor({ maxEntries = 96 } = {}) {
@@ -45,14 +51,22 @@ export class EquipmentAppearanceResolver {
     this.maxEntries = Math.max(8, Math.floor(finite(maxEntries, 96)));
     this.hits = 0;
     this.misses = 0;
+    this.lastKey = null;
+    this.lastValue = null;
   }
 
   resolve(equipment = {}, covenantIdentity = {}, { reducedVfx = false, facingLane = 0 } = {}) {
     const resolvedFacingLane = facingLaneFor(facingLane);
     const key = equipmentAppearanceRevisionKey(equipment, covenantIdentity, reducedVfx, resolvedFacingLane);
+    if (key === this.lastKey && this.lastValue) {
+      this.hits += 1;
+      return this.lastValue;
+    }
     const cached = this.cache.get(key);
     if (cached) {
       this.hits += 1;
+      this.lastKey = key;
+      this.lastValue = cached;
       return cached;
     }
 
@@ -118,6 +132,8 @@ export class EquipmentAppearanceResolver {
     });
 
     this.cache.set(key, result);
+    this.lastKey = key;
+    this.lastValue = result;
     if (this.cache.size > this.maxEntries) this.cache.delete(this.cache.keys().next().value);
     return result;
   }
