@@ -36,6 +36,6 @@ Embodied Covenant presentation release: player body animation, visible equipment
 - v7 embodied combat: PASS
 - v7 architecture/compatibility: PASS
 - v7 performance: PASS
-- npm run test:v6: PASS
+- npm run test:v6: PENDING final release-head run
 - npm run test:file-protocol: PASS
-- npm run test:v7: PASS
+- npm run test:v7: PENDING final release-head run
