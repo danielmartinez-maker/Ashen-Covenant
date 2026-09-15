@@ -1,14 +1,16 @@
 const FAMILY = Object.freeze({
-  flame: { cast: 'flame-cinder-cast', trail: 'flame-pyre-trail', impact: 'flame-brand-impact', semitoneOffset: 3 },
-  grave: { cast: 'grave-ossuary-cast', trail: 'grave-funeral-trail', impact: 'grave-bell-impact', semitoneOffset: -2 },
-  blood: { cast: 'blood-vein-cast', trail: 'blood-scarlet-trail', impact: 'blood-heart-impact', semitoneOffset: -1 },
-  light: { cast: 'light-dawn-cast', trail: 'light-radiant-trail', impact: 'light-sun-impact', semitoneOffset: 5 },
-  storm: { cast: 'storm-static-cast', trail: 'storm-arc-trail', impact: 'storm-thunder-impact', semitoneOffset: 7 },
-  void: { cast: 'void-null-cast', trail: 'void-rift-trail', impact: 'void-collapse-impact', semitoneOffset: -5 }
+  flame: Object.freeze({ cast: 'flame-cinder-cast', trail: 'flame-pyre-trail', impact: 'flame-brand-impact', semitoneOffset: 3 }),
+  grave: Object.freeze({ cast: 'grave-ossuary-cast', trail: 'grave-funeral-trail', impact: 'grave-bell-impact', semitoneOffset: -2 }),
+  blood: Object.freeze({ cast: 'blood-vein-cast', trail: 'blood-scarlet-trail', impact: 'blood-heart-impact', semitoneOffset: -1 }),
+  light: Object.freeze({ cast: 'light-dawn-cast', trail: 'light-radiant-trail', impact: 'light-sun-impact', semitoneOffset: 5 }),
+  storm: Object.freeze({ cast: 'storm-static-cast', trail: 'storm-arc-trail', impact: 'storm-thunder-impact', semitoneOffset: 7 }),
+  void: Object.freeze({ cast: 'void-null-cast', trail: 'void-rift-trail', impact: 'void-collapse-impact', semitoneOffset: -5 })
 });
 
-const DEFAULT = { cast: 'covenant-neutral-cast', trail: 'covenant-neutral-trail', impact: 'covenant-neutral-impact', semitoneOffset: 0 };
-const clone = (value) => JSON.parse(JSON.stringify(value));
+const DEFAULT = Object.freeze({ cast: 'covenant-neutral-cast', trail: 'covenant-neutral-trail', impact: 'covenant-neutral-impact', semitoneOffset: 0 });
+const IDENTITY_CACHE_LIMIT = 256;
+const identityCache = new Map();
+const cachePart = (value) => value == null ? '' : typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' ? String(value) : JSON.stringify(value);
 
 export function resolveCovenantPresentationIdentity(covenant = {}, ability = {}) {
   const affinity = FAMILY[covenant?.primary] ? covenant.primary : 'unbound';
@@ -16,20 +18,34 @@ export function resolveCovenantPresentationIdentity(covenant = {}, ability = {})
   const family = FAMILY[affinity] ?? DEFAULT;
   const presentation = covenant?.effects?.presentation ?? {};
   const audio = covenant?.effects?.audio ?? {};
-  return {
+  const abilityId = ability?.abilityId ?? ability?.slot ?? 'action';
+  const mutationId = ability?.mutationId ?? '';
+  const audioIntensity = Number(audio.intensity) || 0;
+  const key = [
+    affinity, stage, abilityId, mutationId,
+    presentation.aura, presentation.markings, presentation.eyes, presentation.movement, presentation.weapon,
+    audio.motif, audioIntensity
+  ].map(cachePart).join('|');
+  const cached = identityCache.get(key);
+  if (cached) return cached;
+
+  const identity = Object.freeze({
     affinity,
     stage,
-    animationKey: `${affinity}-stage-${stage}:${ability?.abilityId ?? ability?.slot ?? 'action'}${ability?.mutationId ? `:${ability.mutationId}` : ''}`,
-    vfx: clone({ cast: family.cast, trail: family.trail, impact: family.impact }),
-    overlays: {
+    animationKey: `${affinity}-stage-${stage}:${abilityId}${mutationId ? `:${mutationId}` : ''}`,
+    vfx: Object.freeze({ cast: family.cast, trail: family.trail, impact: family.impact }),
+    overlays: Object.freeze({
       aura: stage >= 1 ? presentation.aura ?? null : null,
       markings: stage >= 2 ? presentation.markings ?? null : null,
       eyes: stage >= 3 ? presentation.eyes ?? null : null,
       movement: stage >= 4 ? presentation.movement ?? null : null,
       weapon: stage >= 5 ? presentation.weapon ?? null : null
-    },
-    audio: { motif: audio.motif ?? null, intensity: Number(audio.intensity) || 0, semitoneOffset: family.semitoneOffset }
-  };
+    }),
+    audio: Object.freeze({ motif: audio.motif ?? null, intensity: audioIntensity, semitoneOffset: family.semitoneOffset })
+  });
+  identityCache.set(key, identity);
+  if (identityCache.size > IDENTITY_CACHE_LIMIT) identityCache.delete(identityCache.keys().next().value);
+  return identity;
 }
 
 export function covenantVfxPhase(progress, identity) {
